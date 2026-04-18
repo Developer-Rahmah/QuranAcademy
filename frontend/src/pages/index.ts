@@ -1,0 +1,14 @@
+// Pages - Complete page components
+export { Login } from './Login';
+export { Signup } from './Signup';
+export { ForgotPassword } from './ForgotPassword';
+export { ResetPassword } from './ResetPassword';
+export { RegistrationSuccess } from './RegistrationSuccess';
+export { StudentRegistration } from './StudentRegistration';
+export { TeacherRegistration } from './TeacherRegistration';
+export { StudentDashboard } from './StudentDashboard';
+export { TeacherDashboard } from './TeacherDashboard';
+export { AdminDashboard } from './AdminDashboard';
+export { AdminUsers } from './AdminUsers';
+export { HalaqahDetails } from './HalaqahDetails';
+export { AddReport } from './AddReport';

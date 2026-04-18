@@ -1,0 +1,53 @@
+{
+  "userId": {
+    "id": "7512e6d8-00ff-401d-8da5-09c16c1447a8",
+    "aud": "authenticated",
+    "role": "authenticated",
+    "email": "rahmah3.alabbadi@gmail.com",
+    "email_confirmed_at": "2026-01-30T00:09:32.253254Z",
+    "phone": "",
+    "confirmed_at": "2026-01-30T00:09:32.253254Z",
+    "last_sign_in_at": "2026-01-30T00:43:23.857401088Z",
+    "app_metadata": {
+      "provider": "email",
+      "providers": ["email"]
+    },
+    "user_metadata": {
+      "email": "rahmah3.alabbadi@gmail.com",
+      "email_verified": true,
+      "first_name": "رحمه٢",
+      "phone": "+962779627971",
+      "phone_verified": false,
+      "role": "student",
+      "second_name": "محمود",
+      "sub": "7512e6d8-00ff-401d-8da5-09c16c1447a8",
+      "third_name": "المعادات"
+    },
+    "identities": [
+      {
+        "identity_id": "98314b8d-5f37-4e84-8ba6-75509299d875",
+        "id": "7512e6d8-00ff-401d-8da5-09c16c1447a8",
+        "user_id": "7512e6d8-00ff-401d-8da5-09c16c1447a8",
+        "identity_data": {
+          "email": "rahmah3.alabbadi@gmail.com",
+          "email_verified": false,
+          "first_name": "رحمه٢",
+          "phone": "+962779627971",
+          "phone_verified": false,
+          "role": "student",
+          "second_name": "محمود",
+          "sub": "7512e6d8-00ff-401d-8da5-09c16c1447a8",
+          "third_name": "المعادات"
+        },
+        "provider": "email",
+        "last_sign_in_at": "2026-01-30T00:09:32.246386Z",
+        "created_at": "2026-01-30T00:09:32.246438Z",
+        "updated_at": "2026-01-30T00:09:32.246438Z",
+        "email": "rahmah3.alabbadi@gmail.com"
+      }
+    ],
+    "created_at": "2026-01-30T00:09:32.231016Z",
+    "updated_at": "2026-01-30T00:43:23.859458Z",
+    "is_anonymous": false
+  }
+}
