@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useHalaqah } from '../hooks/useHalaqah';
 import { useAuth } from '../context/AuthContext';
@@ -16,13 +16,7 @@ import { ChartIcon, UsersIcon, SaveIcon, PlusIcon } from '../components/atoms/Ic
 import { useTranslation } from '../locales/i18n';
 import { getDisplayName } from '../lib/utils';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
-import type { Profile } from '../types';
-
-interface StudentWithProgress extends Profile {
-  memorizationPages: number;
-  reviewPages: number;
-  progress: number;
-}
+import type { StudentWithProgress } from '../types';
 
 interface HalaqahStats {
   totalMemorization: number;

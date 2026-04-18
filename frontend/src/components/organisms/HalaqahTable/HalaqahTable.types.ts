@@ -1,15 +1,12 @@
 /**
  * HalaqahTable Component Types
+ *
+ * HalaqahWithStats is defined centrally in src/types so every surface
+ * (AdminDashboard, HalaqahTable, etc.) shares one source of truth.
  */
-import type { Profile } from '../../../types';
+import type { HalaqahWithStats } from '../../../types';
 
-export interface HalaqahWithStats {
-  id: string;
-  name: string;
-  teacher?: Profile | null;
-  studentCount?: number;
-  avgProgress?: number;
-}
+export type { HalaqahWithStats };
 
 export interface HalaqahTableProps {
   halaqahs?: HalaqahWithStats[];

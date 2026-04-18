@@ -1,16 +1,19 @@
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useStudentHalaqah } from '../hooks/useHalaqah';
-import { useStudentReports, useStudentProgress } from '../hooks/useReports';
-import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
-import { Card } from '../components/molecules/Card';
-import { StatCard, StatCardRow } from '../components/molecules/StatCard';
-import { MeetLinkCard } from '../components/molecules/MeetLinkCard';
-import { ReportList } from '../components/organisms/ReportList';
-import { Button } from '../components/atoms/Button';
-import { SaveIcon, RefreshIcon, PlusIcon } from '../components/atoms/Icon';
-import { getDisplayName } from '../lib/utils';
-import { TOTAL_QURAN_PAGES } from '../lib/constants';
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useStudentHalaqah } from "../hooks/useHalaqah";
+import { useStudentReports, useStudentProgress } from "../hooks/useReports";
+import {
+  DashboardLayout,
+  PageSection,
+} from "../components/templates/DashboardLayout";
+import { Card } from "../components/molecules/Card";
+import { StatCard, StatCardRow } from "../components/molecules/StatCard";
+import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
+import { Button } from "../components/atoms/Button";
+import { SaveIcon, RefreshIcon, PlusIcon } from "../components/atoms/Icon";
+import { getDisplayName } from "../lib/utils";
+import { TOTAL_QURAN_PAGES } from "../lib/constants";
+import { ReportList } from "@/components/organisms";
 
 /**
  * Student Dashboard Page
@@ -20,7 +23,9 @@ export function StudentDashboard() {
   const { profile } = useAuth();
   const { halaqah, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
   const { reports, loading: loadingReports } = useStudentReports(profile?.id);
-  const { progress, loading: loadingProgress } = useStudentProgress(profile?.id);
+  const { progress, loading: loadingProgress } = useStudentProgress(
+    profile?.id,
+  );
 
   const isLoading = loadingHalaqah || loadingReports || loadingProgress;
 
@@ -42,7 +47,7 @@ export function StudentDashboard() {
                 <div className="text-center md:text-right">
                   <p className="text-sm text-muted mb-1">اسم الحلقة</p>
                   <p className="text-lg font-medium text-foreground">
-                    {halaqah?.name || 'غير محددة'}
+                    {halaqah?.name || "غير محددة"}
                   </p>
                 </div>
                 <div className="text-center md:text-right">
@@ -50,7 +55,7 @@ export function StudentDashboard() {
                   <p className="text-lg font-medium text-foreground">
                     {halaqah?.teacher
                       ? `أ. ${getDisplayName(halaqah.teacher)}`
-                      : 'غير محددة'}
+                      : "غير محددة"}
                   </p>
                 </div>
               </div>
@@ -89,7 +94,7 @@ export function StudentDashboard() {
           <div className="flex justify-center">
             <Button
               size="lg"
-              onClick={() => navigate('/report/new')}
+              onClick={() => navigate("/report/new")}
               className="px-8"
             >
               <PlusIcon className="w-5 h-5" />

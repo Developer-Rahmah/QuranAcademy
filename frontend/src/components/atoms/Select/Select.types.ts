@@ -11,6 +11,8 @@ export interface SelectOption {
 export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value'> {
   options: SelectOption[];
   error?: boolean;
-  value?: string;
+  // Accept numbers too — FormField forwards numeric values for <FormField type="number" />
+  // and the native <select> happily coerces them.
+  value?: string | number;
   placeholder?: string;
 }

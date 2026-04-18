@@ -10,6 +10,8 @@ export const reportFormStyles = {
   dateSection: 'p-6',
   dateLabel: 'block text-sm font-medium text-foreground mb-1',
 
+  noHalaqah: 'p-6 text-center text-sm text-muted space-y-4',
+
   section: {
     content: 'p-6',
     header: 'flex items-center justify-between mb-4',

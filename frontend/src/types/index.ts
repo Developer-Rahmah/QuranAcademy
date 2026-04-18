@@ -40,12 +40,19 @@ export interface Halaqah {
   teacher?: Pick<Profile, 'id' | 'first_name' | 'second_name'>;
   meet_link?: string;
   level?: MemorizationLevel;
-  target_audience?: StudentType;
+  target_audience?: PreferredAudience;
   schedule?: Record<string, unknown>;
   status: HalaqahStatus;
   created_at: string;
   updated_at: string;
   // Computed fields
+  studentCount?: number;
+  avgProgress?: number;
+}
+
+// Halaqah With Stats — derived type used by tables/dashboards.
+// Kept central so every consumer shares the same teacher shape etc.
+export interface HalaqahWithStats extends Halaqah {
   studentCount?: number;
   avgProgress?: number;
 }
@@ -84,11 +91,16 @@ export interface ReportItem {
   created_at: string;
 }
 
-// Student with Progress
+// Student with Progress — single source of truth shared by StudentTable,
+// TeacherDashboard and any other surface that renders student progress.
+// Progress fields are optional because some call sites populate them lazily
+// and all consumers already fall back to 0 when rendering.
 export interface StudentWithProgress extends Pick<Profile, 'id' | 'first_name' | 'second_name'> {
-  memorizationPages: number;
-  reviewPages: number;
-  progress: number;
+  phone?: string;
+  email?: string;
+  memorizationPages?: number;
+  reviewPages?: number;
+  progress?: number;
 }
 
 // Progress Stats

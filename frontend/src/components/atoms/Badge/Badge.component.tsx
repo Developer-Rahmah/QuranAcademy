@@ -5,7 +5,7 @@
 import { cn } from '../../../lib/utils';
 import { useTranslation } from '../../../locales/i18n';
 import { badgeStyles } from './Badge.style';
-import type { BadgeProps, StatusBadgeProps, StatusConfig, StatusType, BadgeVariant } from './Badge.types';
+import type { BadgeProps, StatusBadgeProps, StatusConfig, StatusType } from './Badge.types';
 
 /**
  * Badge - Small status indicator or label

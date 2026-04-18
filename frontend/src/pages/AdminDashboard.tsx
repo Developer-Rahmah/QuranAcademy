@@ -11,13 +11,7 @@ import { Button } from '../components/atoms/Button';
 import { UsersIcon, TeacherIcon, BookIcon, PlusIcon } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
-import type { Halaqah, Profile } from '../types';
-
-interface HalaqahWithStats extends Halaqah {
-  teacher?: Profile | null;
-  studentCount: number;
-  avgProgress: number;
-}
+import type { HalaqahWithStats } from '../types';
 
 /**
  * Admin Dashboard Page
@@ -78,10 +72,13 @@ export function AdminDashboard() {
 
         // Calculate total academy progress
         const totalMem = halaqahsWithStats.reduce(
-          (sum, h) => sum + (h.avgProgress * h.studentCount),
+          (sum, h) => sum + ((h.avgProgress ?? 0) * (h.studentCount ?? 0)),
           0
         );
-        const totalStudents = halaqahsWithStats.reduce((sum, h) => sum + h.studentCount, 0);
+        const totalStudents = halaqahsWithStats.reduce(
+          (sum, h) => sum + (h.studentCount ?? 0),
+          0
+        );
         const academyAvg = totalStudents > 0 ? Math.round(totalMem / totalStudents) : 0;
 
         setTotalProgress({

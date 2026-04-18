@@ -1,7 +1,6 @@
 /**
  * ReportForm Component Types
  */
-import type { ReportType } from '../../../types';
 
 export interface ReportItem {
   id: string;

@@ -1,7 +1,7 @@
 /**
  * HalaqahForm Types
  */
-import type { Halaqah, Profile } from '../../../types';
+import type { Halaqah, MemorizationLevel, HalaqahStatus, PreferredAudience } from '../../../types';
 
 export interface HalaqahFormProps {
   halaqah?: Halaqah | null;
@@ -14,9 +14,9 @@ export interface HalaqahFormData {
   name: string;
   teacher_id: string;
   meet_link: string;
-  level: string;
-  target_audience: string;
-  status: string;
+  level: MemorizationLevel;
+  target_audience: PreferredAudience;
+  status: HalaqahStatus;
 }
 
 export interface HalaqahFormErrors {

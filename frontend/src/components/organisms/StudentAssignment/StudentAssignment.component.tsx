@@ -13,7 +13,7 @@ import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
 import { studentAssignmentStyles as styles } from './StudentAssignment.style';
 import type { StudentAssignmentProps, StudentWithMembership } from './StudentAssignment.types';
-import type { Profile, HalaqahMember } from '../../../types';
+import type { Profile } from '../../../types';
 
 export function StudentAssignment({
   halaqahId,

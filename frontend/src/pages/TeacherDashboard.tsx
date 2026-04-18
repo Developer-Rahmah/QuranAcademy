@@ -9,13 +9,7 @@ import {
 import { Card } from "../components/molecules/Card";
 import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
 import { StudentTable } from "../components/organisms/StudentTable";
-import type { Profile } from "../types";
-
-interface StudentWithProgress extends Profile {
-  memorizationPages: number;
-  reviewPages: number;
-  progress: number;
-}
+import type { StudentWithProgress } from "../types";
 
 /**
  * Teacher Dashboard Page

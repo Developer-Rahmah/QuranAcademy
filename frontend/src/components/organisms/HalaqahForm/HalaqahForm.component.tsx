@@ -80,11 +80,16 @@ export function HalaqahForm({
     setErrors({});
   }, [halaqah, isOpen]);
 
-  // Handle field change
-  const handleChange = (field: keyof HalaqahFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Handle field change. The `value` comes from either an <input> or a
+  // <select> whose options are all valid enum strings, so casting to the
+  // field's expected union type is safe.
+  const handleChange = <K extends keyof HalaqahFormData>(
+    field: K,
+    value: string,
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value as HalaqahFormData[K] }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 

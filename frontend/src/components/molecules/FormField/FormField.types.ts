@@ -4,7 +4,7 @@
 import { ReactNode, ComponentType } from 'react';
 import type { SelectOption } from '../../atoms/Select';
 
-export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'date' | 'textarea' | 'select';
+export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'date' | 'textarea' | 'select';
 
 export interface FormFieldProps {
   label?: string;

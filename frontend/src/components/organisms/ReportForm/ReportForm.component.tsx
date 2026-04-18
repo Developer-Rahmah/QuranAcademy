@@ -16,7 +16,7 @@ import { Input } from '../../atoms/Input';
 import { Card, CardContent } from '../../molecules/Card';
 import { PlusIcon, SaveIcon, RefreshIcon } from '../../atoms/Icon';
 import { SURAHS, REPORT_TYPES, MIN_PAGES } from '../../../lib/constants';
-import { formatDateISO, validatePages, generateId } from '../../../lib/utils';
+import { cn, formatDateISO, validatePages, generateId } from '../../../lib/utils';
 import { getErrorMessage } from '../../../lib/errorHandler';
 import { reportFormStyles } from './ReportForm.style';
 import type { ReportItem, FormErrors, ReportFormProps } from './ReportForm.types';
@@ -30,7 +30,7 @@ export function ReportForm({ className }: ReportFormProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const { profile } = useAuth();
-  const { membership, loading: loadingHalaqah, error: halaqahError } = useStudentHalaqah(profile?.id);
+  const { membership, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
   const { createReport, loading: submitting } = useCreateReport();
 
   // Form state
@@ -295,7 +295,7 @@ export function ReportForm({ className }: ReportFormProps) {
   // Render Form
   // ============================================
   return (
-    <form onSubmit={handleSubmit} className={reportFormStyles.form}>
+    <form onSubmit={handleSubmit} className={cn(reportFormStyles.form, className)}>
       {/* Error Messages */}
       {submitError && <div className={reportFormStyles.error}>{submitError}</div>}
       {errors.general && <div className={reportFormStyles.error}>{errors.general}</div>}
