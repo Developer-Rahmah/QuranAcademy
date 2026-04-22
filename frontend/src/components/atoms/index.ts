@@ -51,9 +51,19 @@ export {
   ChatIcon,
   ChartIcon,
   EyeIcon,
+  FacebookIcon,
+  InstagramIcon,
+  WhatsappIcon,
 } from './Icon';
 export type { IconProps, IconSize } from './Icon';
 
 // Modal
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
+
+// Logo
+export { Logo } from './Logo';
+export type { LogoSize } from './Logo';
+
+// LanguageSwitcher
+export { LanguageSwitcher } from './LanguageSwitcher';

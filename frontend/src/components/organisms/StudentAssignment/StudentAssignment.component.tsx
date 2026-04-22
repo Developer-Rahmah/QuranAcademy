@@ -11,6 +11,8 @@ import { PlusIcon, UsersIcon } from '../../atoms/Icon';
 import { db } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
+import { canStudentJoinHalaqah } from '../../../lib/domain/roleRules';
+import { uiText } from '../../../lib/uiText';
 import { studentAssignmentStyles as styles } from './StudentAssignment.style';
 import type { StudentAssignmentProps, StudentWithMembership } from './StudentAssignment.types';
 import type { Profile } from '../../../types';
@@ -18,6 +20,7 @@ import type { Profile } from '../../../types';
 export function StudentAssignment({
   halaqahId,
   halaqahName,
+  halaqah,
   isOpen,
   onClose,
   onSuccess,
@@ -85,6 +88,15 @@ export function StudentAssignment({
 
   // Assign student to halaqah
   const assignStudent = async (studentId: string) => {
+    // Defensive guard — the Assign button is disabled for incompatible
+    // students, but we also block a programmatic call just in case a
+    // consumer calls this directly.
+    const target = students.find((s) => s.id === studentId);
+    if (target && halaqah && !canStudentJoinHalaqah(target, halaqah)) {
+      toast.error(t('assignment.incompatibleGender'));
+      return;
+    }
+
     setActionLoading(studentId);
     try {
       const { error } = await db.members.add(halaqahId, studentId);
@@ -135,8 +147,13 @@ export function StudentAssignment({
     return parts.join(' ') || student.email;
   };
 
-  // Filter students by search query
+  // Filter students by search query AND audience compatibility.
+  // Compatibility-hiding: mismatched students are hidden entirely so the
+  // admin can't see them as options. This enforces the rule both visually
+  // and logically — no disabled rows, no fallback list. The defensive
+  // `assignStudent` guard remains as belt-and-braces.
   const filteredUnassigned = students.filter(student => {
+    if (halaqah && !canStudentJoinHalaqah(student, halaqah)) return false;
     const name = getDisplayName(student).toLowerCase();
     const email = (student.email || '').toLowerCase();
     const query = searchQuery.toLowerCase();
@@ -147,7 +164,7 @@ export function StudentAssignment({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`${t('admin.manageStudents')} - ${halaqahName}`}
+      title={`${t(uiText.getManageStudentsLabel(halaqah?.segment))} - ${halaqahName}`}
       size="lg"
     >
       {loading ? (
@@ -160,13 +177,13 @@ export function StudentAssignment({
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <UsersIcon className="w-4 h-4" />
-              {t('admin.assignedStudents')}
+              {t(uiText.getAssignedParticipantsLabel(halaqah?.segment))}
               <span className={styles.sectionCount}>{assignedStudents.length}</span>
             </h3>
 
             {assignedStudents.length === 0 ? (
               <div className={styles.emptyState}>
-                {t('admin.noAssignedStudents')}
+                {t(uiText.getEmptyStateText('student', halaqah?.segment))}
               </div>
             ) : (
               <div className={styles.studentList}>
@@ -199,14 +216,14 @@ export function StudentAssignment({
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <PlusIcon className="w-4 h-4" />
-              {t('admin.availableStudents')}
+              {t(uiText.getAvailableParticipantsLabel(halaqah?.segment))}
               <span className={styles.sectionCount}>{students.length}</span>
             </h3>
 
             {/* Search */}
             <Input
               type="text"
-              placeholder={t('admin.searchStudents')}
+              placeholder={t(uiText.getSearchStudentLabel(halaqah?.segment))}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={styles.searchInput}
@@ -214,34 +231,44 @@ export function StudentAssignment({
 
             {filteredUnassigned.length === 0 ? (
               <div className={styles.emptyState}>
-                {searchQuery ? t('admin.noSearchResults') : t('admin.allStudentsAssigned')}
+                {searchQuery
+                  ? t('admin.noSearchResults')
+                  : t(uiText.getEmptyStateText('student', halaqah?.segment))}
               </div>
             ) : (
               <div className={styles.studentList}>
-                {filteredUnassigned.map(student => (
-                  <div key={student.id} className={styles.studentItem}>
-                    <div className={styles.studentInfo}>
-                      <div className={styles.studentName}>{getDisplayName(student)}</div>
-                      <div className={styles.studentMeta}>
-                        <span>{student.email}</span>
-                        {student.memorization_level && (
-                          <Badge variant="secondary" size="sm">
-                            {t(`registration.${student.memorization_level}`)}
-                          </Badge>
-                        )}
+                {filteredUnassigned.map((student) => {
+                  // By this point `filteredUnassigned` already excludes
+                  // audience-incompatible students, so every row here is
+                  // assignable. The defensive guard inside `assignStudent`
+                  // remains in place for programmatic safety.
+                  return (
+                    <div key={student.id} className={styles.studentItem}>
+                      <div className={styles.studentInfo}>
+                        <div className={styles.studentName}>
+                          {getDisplayName(student)}
+                        </div>
+                        <div className={styles.studentMeta}>
+                          <span>{student.email}</span>
+                          {student.memorization_level && (
+                            <Badge variant="secondary" size="sm">
+                              {t(`registration.${student.memorization_level}`)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => assignStudent(student.id)}
+                        loading={actionLoading === student.id}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        {t('admin.assign')}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => assignStudent(student.id)}
-                      loading={actionLoading === student.id}
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      {t('admin.assign')}
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

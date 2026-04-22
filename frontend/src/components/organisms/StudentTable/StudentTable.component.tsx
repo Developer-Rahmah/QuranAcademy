@@ -9,6 +9,7 @@ import { Badge } from '../../atoms/Badge';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { DocumentIcon } from '../../atoms/Icon';
 import { getDisplayName } from '../../../lib/utils';
+import { uiText } from '../../../lib/uiText';
 import { studentTableStyles, studentCardStyles } from './StudentTable.style';
 import type { StudentTableProps, StudentCardProps } from './StudentTable.types';
 
@@ -20,6 +21,7 @@ export function StudentTable({
   loading = false,
   showReportsButton = true,
   onViewReports,
+  segment,
 }: StudentTableProps) {
   const { t } = useTranslation();
 
@@ -36,7 +38,9 @@ export function StudentTable({
   if (students.length === 0) {
     return (
       <Card padding="lg">
-        <p className={studentTableStyles.empty}>{t('student.title')}</p>
+        <p className={studentTableStyles.empty}>
+          {t(uiText.getEmptyStateText('student', segment))}
+        </p>
       </Card>
     );
   }

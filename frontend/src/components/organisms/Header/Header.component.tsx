@@ -5,11 +5,12 @@
 import { useAuth } from '../../../context/AuthContext';
 import { useTranslation } from '../../../locales/i18n';
 import { Button } from '../../atoms/Button';
-import { UserIcon, LogoutIcon, BookIcon } from '../../atoms/Icon';
-import { ROLE_LABELS } from '../../../lib/constants';
+import { UserIcon, LogoutIcon } from '../../atoms/Icon';
+import { Logo } from '../../atoms/Logo';
+import { LanguageSwitcher } from '../../atoms/LanguageSwitcher';
 import { getDisplayName } from '../../../lib/utils';
 import { headerStyles } from './Header.style';
-import type { UserRole } from '../../../types';
+import { segmentationRules } from '../../../lib/segmentationRules';
 
 /**
  * Header - Dashboard header with user info and logout
@@ -33,7 +34,7 @@ export function Header() {
             </div>
             <div>
               <p className={headerStyles.userInfo.role}>
-                {profile?.role && ROLE_LABELS[profile.role as UserRole]}
+                {profile && t(segmentationRules.getUserRoleLabel(profile))}
               </p>
               <p className={headerStyles.userInfo.name}>
                 {profile ? `أ. ${getDisplayName(profile)}` : ''}
@@ -41,24 +42,25 @@ export function Header() {
             </div>
           </div>
 
-          {/* Logo - Center (optional) */}
+          {/* Logo - Center */}
           <div className={headerStyles.logo.wrapper}>
-            <div className={headerStyles.logo.iconWrapper}>
-              <BookIcon className={headerStyles.logo.icon} />
-            </div>
+            <Logo size="sm" />
           </div>
 
-          {/* Logout button - Left side in RTL */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleLogout}
-            disabled={loading}
-            className={headerStyles.logoutButton}
-          >
-            <span>{t('auth.logout')}</span>
-            <LogoutIcon className={headerStyles.logoutIcon} />
-          </Button>
+          {/* Language switcher + logout button - Left side in RTL */}
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              disabled={loading}
+              className={headerStyles.logoutButton}
+            >
+              <span>{t('auth.logout')}</span>
+              <LogoutIcon className={headerStyles.logoutIcon} />
+            </Button>
+          </div>
         </div>
       </div>
     </header>

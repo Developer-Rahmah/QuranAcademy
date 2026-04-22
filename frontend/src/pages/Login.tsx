@@ -11,6 +11,7 @@ import { FormField } from '../components/molecules/FormField';
 import { Button } from '../components/atoms/Button';
 import { isValidEmail } from '../lib/utils';
 import { getErrorMessage } from '../lib/errorHandler';
+import { ROUTES } from '../lib/routes';
 
 // ============================================
 // Types
@@ -97,9 +98,13 @@ export function Login() {
       return;
     }
 
-    // Success - navigate to dashboard
+    // Success — navigate immediately to the neutral dashboard entrypoint.
+    // The DashboardDispatcher there reads the profile role as soon as it
+    // hydrates and redirects to /admin for admins, or renders the correct
+    // role component for teachers/students. This keeps login→redirect
+    // snappy even if the profile SELECT is still in flight.
     toast.success(t('dashboard.welcome'));
-    navigate('/dashboard');
+    navigate(ROUTES.dashboard, { replace: true });
   };
 
   return (
@@ -119,6 +124,7 @@ export function Login() {
             label={t('auth.emailOrPhone')}
             name="email"
             type="email"
+            required
             placeholder={t('auth.enterEmailOrPhone')}
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
@@ -129,6 +135,7 @@ export function Login() {
             label={t('auth.password')}
             name="password"
             type="password"
+            required
             placeholder={t('auth.enterPassword')}
             value={formData.password}
             onChange={(e) => handleChange('password', e.target.value)}

@@ -8,6 +8,7 @@ import { Card } from '../../molecules/Card';
 import { Button } from '../../atoms/Button';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { EyeIcon } from '../../atoms/Icon';
+import { StatusBadge } from '../../atoms/Badge';
 import { getDisplayName } from '../../../lib/utils';
 import { halaqahTableStyles } from './HalaqahTable.style';
 import type { HalaqahTableProps } from './HalaqahTable.types';
@@ -46,6 +47,7 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
               {showActions && (
                 <th className={halaqahTableStyles.headerCell}>{t('common.edit')}</th>
               )}
+              <th className={halaqahTableStyles.headerCell}>{t('admin.status')}</th>
               <th className={halaqahTableStyles.headerCell}>{t('common.progress')}</th>
               <th className={halaqahTableStyles.headerCell}>{t('halaqah.studentCount')}</th>
               <th className={halaqahTableStyles.headerCell}>{t('halaqah.teacherName')}</th>
@@ -70,6 +72,9 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
                     </Button>
                   </td>
                 )}
+                <td className={halaqahTableStyles.bodyCell}>
+                  {halaqah.status && <StatusBadge status={halaqah.status} />}
+                </td>
                 <td className={halaqahTableStyles.bodyCell}>
                   <div className={halaqahTableStyles.progressCell.wrapper}>
                     <span className={halaqahTableStyles.progressCell.value}>
