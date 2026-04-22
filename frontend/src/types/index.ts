@@ -2,6 +2,16 @@
 // Type Definitions for Quran Academy
 // ============================================
 
+// Canonical enums — public names for gender/role. Kept in a separate
+// file so they can be imported without pulling in the whole types module.
+export { Segment, Role } from './enums';
+export type { SegmentValue, RoleValue } from './enums';
+
+// Unified audience abstraction — the single axis the UI resolver uses
+// to pick gendered/neutral copy.
+export { toAudienceContext, DEFAULT_AUDIENCE_CONTEXT } from './audience';
+export type { AudienceContext } from './audience';
+
 // Database Enums
 export type UserRole = 'student' | 'teacher' | 'admin';
 export type StudentType = 'woman' | 'child';
@@ -10,6 +20,11 @@ export type PreferredAudience = 'children' | 'women' | 'both';
 export type AccountStatus = 'pending' | 'active' | 'suspended';
 export type HalaqahStatus = 'active' | 'paused' | 'completed';
 export type ReportType = 'memorization' | 'review';
+/**
+ * User segmentation — added in migration 0005. Defaults to 'women' so
+ * existing rows continue to map cleanly to the pre-segmentation world.
+ */
+export type UserSegment = 'women' | 'men' | 'children' | 'non_arab_speakers';
 
 // Profile
 export interface Profile {
@@ -30,7 +45,25 @@ export interface Profile {
   status: AccountStatus;
   created_at: string;
   updated_at: string;
+  // Added in migration 0005 — segmentation + teacher extensions + riwayah.
+  segment?: UserSegment;
+  /** Free-form riwayah name (student: current; teacher: primary). */
+  recitation?: string | null;
+  /** Teachers only: number of Quran parts they can teach (1..30). */
+  quran_parts_taught?: number | null;
+  /** Teachers only: holds a Quran ijazah. */
+  is_certified?: boolean;
+  /** Teachers only: riwayat the teacher is authorized in. */
+  authorized_recitations?: string[];
+  /**
+   * Language — single source of truth. Values: 'arabic_speaker' |
+   * 'non_arabic_speaker'. Column already exists in the profiles table.
+   * A missing value is treated as 'arabic_speaker' at the UI layer only.
+   */
+  language_type?: LanguageType | null;
 }
+
+export type LanguageType = 'arabic_speaker' | 'non_arabic_speaker';
 
 // Halaqah
 export interface Halaqah {
@@ -43,6 +76,13 @@ export interface Halaqah {
   target_audience?: PreferredAudience;
   schedule?: Record<string, unknown>;
   status: HalaqahStatus;
+  /**
+   * Optional gender segment for the halaqah (men/women). Set in the admin
+   * UI; if the DB column doesn't exist yet, Supabase simply ignores the
+   * extra key — nothing breaks. Consumers that know about it can filter
+   * or gate UI on it; consumers that don't keep working unchanged.
+   */
+  segment?: Extract<UserSegment, 'men' | 'women'>;
   created_at: string;
   updated_at: string;
   // Computed fields
@@ -227,7 +267,18 @@ export interface IconProps {
 export interface AuthContextType {
   user: User | null;
   profile: Profile | null;
+  /**
+   * Auth-session hydration flag. True during the initial getSession() roundtrip
+   * and during a signIn/signUp in-flight. Becomes false as soon as we know
+   * whether a session exists — independent of whether the profile has loaded.
+   */
   loading: boolean;
+  /**
+   * Profile-fetch flag. Tracks the background SELECT on `profiles`.
+   * Guards use this to distinguish "profile not yet hydrated" (→ spinner)
+   * from "profile confirmed missing" (→ sign-out + redirect).
+   */
+  profileLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string, profileData: Partial<Profile>) => Promise<AuthResult>;

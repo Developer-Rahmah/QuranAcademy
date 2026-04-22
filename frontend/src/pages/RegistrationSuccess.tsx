@@ -43,7 +43,7 @@ export function RegistrationSuccess() {
           </p>
 
           {/* Back to login button */}
-          <Link to="/">
+          <Link to="/login">
             <Button size="full">
               العودة إلى تسجيل الدخول
             </Button>

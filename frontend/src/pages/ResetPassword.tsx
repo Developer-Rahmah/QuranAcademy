@@ -117,7 +117,7 @@ export function ResetPassword() {
       try {
         await signOut();
       } finally {
-        navigate('/', { replace: true });
+        navigate('/login', { replace: true });
       }
     }, SUCCESS_REDIRECT_MS);
   };
@@ -148,7 +148,7 @@ export function ResetPassword() {
             <Link to="/forgot-password">
               <Button size="full">طلب رابط جديد</Button>
             </Link>
-            <Link to="/" className="block text-sm text-primary hover:underline">
+            <Link to="/login" className="block text-sm text-primary hover:underline">
               العودة إلى تسجيل الدخول
             </Link>
           </div>
@@ -218,7 +218,7 @@ export function ResetPassword() {
           </Button>
 
           <p className="text-center text-sm text-muted">
-            <Link to="/" className="text-primary hover:underline">
+            <Link to="/login" className="text-primary hover:underline">
               العودة إلى تسجيل الدخول
             </Link>
           </p>

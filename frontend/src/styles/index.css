@@ -6,10 +6,13 @@
 @layer base {
   html {
     direction: rtl;
+    /* Explicit 16px root so Tailwind's rem-based spacing + text utilities
+       land at WCAG-friendly sizes regardless of browser defaults. */
+    font-size: 16px;
   }
 
   body {
-    @apply font-arabic text-foreground antialiased;
+    @apply font-arabic text-foreground antialiased text-base leading-relaxed;
     font-feature-settings: "kern" 1;
     text-rendering: optimizeLegibility;
   }

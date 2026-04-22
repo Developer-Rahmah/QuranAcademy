@@ -167,6 +167,48 @@ export function EyeIcon({ className, size }: IconProps) {
   );
 }
 
+// ----- Brand icons -----
+// Brand glyphs use fill (not stroke) so they get their own wrapper variant.
+// Paths are simplified official marks, safe for monochrome tinting via
+// `currentColor` so callers can color them with Tailwind text utilities.
+function BrandIconWrapper({ children, className, size = 'md', ...props }: IconWrapperProps) {
+  return (
+    <svg
+      className={cn(iconStyles.sizes[size], className)}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function FacebookIcon({ className, size }: IconProps) {
+  return (
+    <BrandIconWrapper className={className} size={size}>
+      <path d="M13.5 21v-7.5h2.5l.5-3h-3V8.5c0-.9.3-1.5 1.6-1.5H17V4.1c-.3 0-1.2-.1-2.2-.1-2.2 0-3.8 1.3-3.8 3.8v2.2H8v3h3V21h2.5z" />
+    </BrandIconWrapper>
+  );
+}
+
+export function InstagramIcon({ className, size }: IconProps) {
+  return (
+    <BrandIconWrapper className={className} size={size}>
+      <path d="M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.5 1 .5.5.8.9 1 1.5.2.4.3 1 .4 2.2.1 1.2.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-1 1.5-.5.5-.9.8-1.5 1-.4.2-1 .3-2.2.4-1.2.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.5-1-.5-.5-.8-.9-1-1.5-.2-.4-.3-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 1-1.5.5-.5.9-.8 1.5-1 .4-.2 1-.3 2.2-.4 1.2-.1 1.6-.1 4.8-.1zm0 2c-3.1 0-3.5 0-4.7.1-1 0-1.5.2-1.9.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.4-.3.9-.3 1.9-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c0 1 .2 1.5.3 1.9.2.5.4.8.7 1.1.3.3.6.5 1.1.7.4.1.9.3 1.9.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1 0 1.5-.2 1.9-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.4.3-.9.3-1.9.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c0-1-.2-1.5-.3-1.9-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.4-.1-.9-.3-1.9-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.4a4.4 4.4 0 110 8.8 4.4 4.4 0 010-8.8zm0 2a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8zm4.6-2.3a1 1 0 110 2 1 1 0 010-2z" />
+    </BrandIconWrapper>
+  );
+}
+
+export function WhatsappIcon({ className, size }: IconProps) {
+  return (
+    <BrandIconWrapper className={className} size={size}>
+      <path d="M20.5 3.5A10 10 0 003.4 16.9L2 22l5.3-1.4A10 10 0 1020.5 3.5zM12 20.1a8.1 8.1 0 01-4.1-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.1 8.1 0 1120.1 12 8.1 8.1 0 0112 20.1zm4.7-6c-.3-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1-.2.3-.7.8-.8.9-.2.2-.3.2-.5.1-.3-.1-1.1-.4-2.1-1.3-.8-.7-1.3-1.6-1.5-1.9-.2-.3 0-.4.1-.5l.4-.5c.1-.1.2-.3.3-.4 0-.2 0-.3-.1-.5-.1-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4H8.6c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.3s1 2.7 1.1 2.9c.1.2 1.9 2.9 4.6 4.1 2.3 1 2.7.8 3.2.8.5 0 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.6-.3z" />
+    </BrandIconWrapper>
+  );
+}
+
 export default {
   BookIcon,
   UserIcon,
@@ -186,4 +228,7 @@ export default {
   ChatIcon,
   ChartIcon,
   EyeIcon,
+  FacebookIcon,
+  InstagramIcon,
+  WhatsappIcon,
 };

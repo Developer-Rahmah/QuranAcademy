@@ -9,12 +9,15 @@ import {
 import { Card } from "../components/molecules/Card";
 import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
 import { StudentTable } from "../components/organisms/StudentTable";
+import { uiText } from "../lib/uiText";
+import { useTranslation } from "../locales/i18n";
 import type { StudentWithProgress } from "../types";
 
 /**
  * Teacher Dashboard Page
  */
 export function TeacherDashboard() {
+  const { t } = useTranslation();
   const { profile } = useAuth();
   const { halaqahs, loading: loadingHalaqahs } = useHalaqahs({
     teacherId: profile?.id,
@@ -79,7 +82,14 @@ export function TeacherDashboard() {
   const isLoading = loadingHalaqahs || loadingHalaqah;
 
   return (
-    <DashboardLayout title="بارك الله في جهودك" subtitle="متابعة تقدم الطالبات">
+    <DashboardLayout
+      title={t('dashboard.teacherBlessingFemale')}
+      subtitle={t(
+        `dashboard.teacherProgressSubtitle${
+          halaqah?.segment === 'men' ? 'Male' : halaqah?.segment === 'women' ? 'Female' : 'Neutral'
+        }`,
+      )}
+    >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -87,23 +97,33 @@ export function TeacherDashboard() {
       ) : !halaqah ? (
         <Card padding="lg">
           <p className="text-center text-muted py-8">
-            لم يتم تعيينك في حلقة بعد. يرجى التواصل مع الإدارة.
+            {t('dashboard.noHalaqahAssigned')}
           </p>
         </Card>
       ) : (
         <div className="space-y-8">
           {/* Halaqah Info */}
-          <PageSection title="حلقتي">
+          <PageSection title={t('dashboard.myHalaqah')}>
             <Card padding="md" variant="bordered">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="text-center md:text-right">
-                  <p className="text-sm text-muted mb-1">اسم الحلقة</p>
+                  <p className="text-sm text-muted mb-1">{t('dashboard.halaqahNameLabel')}</p>
                   <p className="text-lg font-medium text-foreground">
                     {halaqah.name}
                   </p>
                 </div>
                 <div className="text-center md:text-right">
-                  <p className="text-sm text-muted mb-1">عدد الطالبات</p>
+                  <p className="text-sm text-muted mb-1">
+                    {t(
+                      `dashboard.studentsCountLabel${
+                        halaqah?.segment === 'men'
+                          ? 'Male'
+                          : halaqah?.segment === 'women'
+                          ? 'Female'
+                          : 'Neutral'
+                      }`,
+                    )}
+                  </p>
                   <p className="text-lg font-medium text-foreground">
                     {students.length}
                   </p>
@@ -115,12 +135,14 @@ export function TeacherDashboard() {
             </Card>
           </PageSection>
 
-          {/* Students List */}
-          <PageSection title="الطالبات">
+          {/* Students List — title + empty state both derive from the
+              halaqah's segment via the uiText single source. */}
+          <PageSection title={t(uiText.getStudentLabel(halaqah?.segment, 'plural'))}>
             <StudentTable
               students={students}
               loading={loadingStudents}
               onViewReports={handleViewReports}
+              segment={halaqah?.segment}
             />
           </PageSection>
         </div>

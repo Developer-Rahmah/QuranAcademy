@@ -13,12 +13,15 @@ import { Button } from "../components/atoms/Button";
 import { SaveIcon, RefreshIcon, PlusIcon } from "../components/atoms/Icon";
 import { getDisplayName } from "../lib/utils";
 import { TOTAL_QURAN_PAGES } from "../lib/constants";
+import { useTranslation } from "../locales/i18n";
+import { uiText } from "../lib/uiText";
 import { ReportList } from "@/components/organisms";
 
 /**
  * Student Dashboard Page
  */
 export function StudentDashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { halaqah, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
@@ -31,8 +34,8 @@ export function StudentDashboard() {
 
   return (
     <DashboardLayout
-      title="وفقك الله لحفظ كتابه الكريم"
-      subtitle="تابعي تقدمك في رحلة حفظ القرآن"
+      title={t('dashboard.studentWelcome')}
+      subtitle={t('dashboard.studentSubtitle')}
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -41,21 +44,23 @@ export function StudentDashboard() {
       ) : (
         <div className="space-y-8">
           {/* Halaqah Info */}
-          <PageSection title="حلقتي">
+          <PageSection title={t('dashboard.myHalaqah')}>
             <Card padding="md" variant="bordered">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="text-center md:text-right">
-                  <p className="text-sm text-muted mb-1">اسم الحلقة</p>
+                  <p className="text-sm text-muted mb-1">{t('dashboard.halaqahNameLabel')}</p>
                   <p className="text-lg font-medium text-foreground">
-                    {halaqah?.name || "غير محددة"}
+                    {halaqah?.name || t('halaqah.notAssigned')}
                   </p>
                 </div>
                 <div className="text-center md:text-right">
-                  <p className="text-sm text-muted mb-1">اسم المعلمة</p>
+                  <p className="text-sm text-muted mb-1">
+                    {t(uiText.getTeacherLabel(halaqah?.segment, 'singular'))}
+                  </p>
                   <p className="text-lg font-medium text-foreground">
                     {halaqah?.teacher
-                      ? `أ. ${getDisplayName(halaqah.teacher)}`
-                      : "غير محددة"}
+                      ? getDisplayName(halaqah.teacher)
+                      : t('halaqah.notAssigned')}
                   </p>
                 </div>
               </div>

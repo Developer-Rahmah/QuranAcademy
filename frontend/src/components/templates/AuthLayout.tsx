@@ -1,5 +1,9 @@
 import { ReactNode } from 'react';
-import { BookIcon } from '../atoms/Icon';
+import { Logo } from '../atoms/Logo';
+import { LanguageSwitcher } from '../atoms/LanguageSwitcher';
+import { SocialLinks } from '../molecules/SocialLinks';
+import { useTranslation } from '../../locales/i18n';
+import { useSettings } from '../../context/SettingsContext';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -12,15 +16,20 @@ interface AuthLayoutProps {
  * Centers content with logo and optional hadith quote at bottom
  */
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
+  const { t } = useTranslation();
+  const { academyDescription } = useSettings();
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Top bar — language switcher only, no other chrome on auth pages. */}
+      <div className="flex justify-end px-4 pt-4">
+        <LanguageSwitcher />
+      </div>
+
       {/* Main content area */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         {/* Logo */}
         <div className="mb-6">
-          <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
-            <BookIcon className="w-8 h-8 text-white" />
-          </div>
+          <Logo size="md" className="shadow-sm" />
         </div>
 
         {/* Title */}
@@ -41,11 +50,15 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         </div>
       </main>
 
-      {/* Footer with hadith */}
-      <footer className="py-6 text-center">
-        <p className="text-muted text-sm">
-          خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ
+      {/* Footer: description (from settings) + hadith + social icons */}
+      <footer className="py-6 px-4 text-center space-y-3 border-t border-border/50">
+        <p className="text-muted text-sm max-w-xl mx-auto">
+          {academyDescription}
         </p>
+        <p className="text-muted text-sm">
+          {t('academy.hadith')}
+        </p>
+        <SocialLinks size="sm" />
       </footer>
     </div>
   );

@@ -56,7 +56,7 @@ export function ForgotPassword() {
             <p className="text-sm text-muted">
               يرجى التحقق من بريدك الإلكتروني واتباع التعليمات لإعادة تعيين كلمة المرور
             </p>
-            <Link to="/">
+            <Link to="/login">
               <Button variant="outline" size="full" className="mt-4">
                 العودة إلى تسجيل الدخول
               </Button>
@@ -108,7 +108,7 @@ export function ForgotPassword() {
           </Button>
 
           <p className="text-center text-sm text-muted">
-            <Link to="/" className="text-primary hover:underline">
+            <Link to="/login" className="text-primary hover:underline">
               العودة إلى تسجيل الدخول
             </Link>
           </p>

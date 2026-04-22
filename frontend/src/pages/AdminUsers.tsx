@@ -3,7 +3,13 @@
  * Allows viewing, activating, and suspending user accounts
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/supabase';
+import { adminUserDetailPath } from '../lib/routes';
+import { segmentationRules } from '../lib/segmentationRules';
+// AdminUsers is a MIXED context (admin manages everyone), so plural
+// labels like "students" / "teachers" resolve to the neutral variant.
+import { uiText } from '../lib/uiText';
 import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
 import { Button } from '../components/atoms/Button';
 import { Select } from '../components/atoms/Select';
@@ -11,17 +17,19 @@ import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { UsersIcon, TeacherIcon, CheckIcon } from '../components/atoms/Icon';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from '../locales/i18n';
-import type { Profile, UserRole, AccountStatus } from '../types';
+import type { Profile, UserRole, AccountStatus, UserSegment } from '../types';
 
 // ============================================
 // Types
 // ============================================
-type FilterRole = UserRole | 'all';
-type FilterStatus = AccountStatus | 'all';
+type FilterRole    = UserRole | 'all';
+type FilterStatus  = AccountStatus | 'all';
+type FilterSegment = UserSegment | 'all';
 
 interface UserFilters {
   role: FilterRole;
   status: FilterStatus;
+  segment: FilterSegment;
 }
 
 // ============================================
@@ -30,13 +38,13 @@ interface UserFilters {
 const styles = {
   filtersContainer: 'flex flex-wrap gap-4 mb-6',
   filterGroup: 'flex items-center gap-2',
-  filterLabel: 'text-sm text-muted',
+  filterLabel: 'text-base text-muted',
   table: 'w-full',
   tableHead: 'bg-muted/50',
-  tableHeadCell: 'px-4 py-3 text-right text-sm font-medium text-foreground',
+  tableHeadCell: 'px-4 py-3 text-right text-base font-medium text-foreground',
   tableBody: 'divide-y divide-border',
   tableRow: 'hover:bg-muted/30 transition-colors',
-  tableCell: 'px-4 py-3 text-sm',
+  tableCell: 'px-4 py-3 text-base',
   tableCellName: 'font-medium text-foreground',
   tableCellMuted: 'text-muted',
   actionsCell: 'flex gap-2',
@@ -46,7 +54,7 @@ const styles = {
   statsRow: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6',
   statCard: 'bg-card p-4 rounded-lg border border-border text-center',
   statValue: 'text-2xl font-bold text-foreground',
-  statLabel: 'text-sm text-muted',
+  statLabel: 'text-base text-muted',
 };
 
 // ============================================
@@ -55,6 +63,7 @@ const styles = {
 export function AdminUsers() {
   const { t } = useTranslation();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +71,7 @@ export function AdminUsers() {
   const [filters, setFilters] = useState<UserFilters>({
     role: 'all',
     status: 'all',
+    segment: 'all',
   });
 
   // ============================================
@@ -86,9 +96,14 @@ export function AdminUsers() {
         return;
       }
 
-      // Filter out admin users from the list
-      const nonAdminUsers = (data || []).filter(u => u.role !== 'admin');
-      setUsers(nonAdminUsers);
+      // Filter out admin users from the list, then apply the segment filter
+      // client-side (kept here rather than pushed into the db facade to avoid
+      // re-touching the Supabase layer for this small addition).
+      const nonAdminUsers = (data || []).filter((u) => u.role !== 'admin');
+      const afterSegment = filters.segment === 'all'
+        ? nonAdminUsers
+        : nonAdminUsers.filter((u) => u.segment === filters.segment);
+      setUsers(afterSegment);
     } catch (err) {
       console.error('Error fetching users:', err);
       toast.error(t('errors.generic'));
@@ -149,8 +164,8 @@ export function AdminUsers() {
   // ============================================
   const roleOptions = [
     { value: 'all', label: t('common.all') },
-    { value: 'student', label: t('admin.students') },
-    { value: 'teacher', label: t('admin.teachers') },
+    { value: 'student', label: t(uiText.getStudentLabel('mixed', 'plural')) },
+    { value: 'teacher', label: t(uiText.getTeacherLabel('mixed', 'plural')) },
   ];
 
   const statusOptions = [
@@ -158,6 +173,16 @@ export function AdminUsers() {
     { value: 'pending', label: t('status.pending') },
     { value: 'active', label: t('status.active') },
     { value: 'suspended', label: t('status.suspended') },
+  ];
+
+  // Language (Arabic / non-Arabic speaker) is a separate profile attribute
+  // now — it must not appear in the segment filter. Segment filter is
+  // strictly gender/age: all | women | men | children.
+  const segmentOptions = [
+    { value: 'all',      label: t('common.all') },
+    { value: 'women',    label: t('segment.women') },
+    { value: 'men',      label: t('segment.men') },
+    { value: 'children', label: t('segment.children') },
   ];
 
   // ============================================
@@ -176,11 +201,15 @@ export function AdminUsers() {
         </div>
         <div className={styles.statCard}>
           <div className={styles.statValue}>{stats.students}</div>
-          <div className={styles.statLabel}>{t('admin.students')}</div>
+          <div className={styles.statLabel}>
+            {t(uiText.getStudentLabel('mixed', 'plural'))}
+          </div>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statValue}>{stats.teachers}</div>
-          <div className={styles.statLabel}>{t('admin.teachers')}</div>
+          <div className={styles.statLabel}>
+            {t(uiText.getTeacherLabel('mixed', 'plural'))}
+          </div>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statValue}>{stats.pending}</div>
@@ -206,6 +235,14 @@ export function AdminUsers() {
             options={statusOptions}
           />
         </div>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>{t('segment.label')}:</span>
+          <Select
+            value={filters.segment}
+            onChange={(e) => setFilters(prev => ({ ...prev, segment: e.target.value as FilterSegment }))}
+            options={segmentOptions}
+          />
+        </div>
       </div>
 
       {/* Users Table */}
@@ -227,13 +264,18 @@ export function AdminUsers() {
                   <th className={styles.tableHeadCell}>{t('auth.email')}</th>
                   <th className={styles.tableHeadCell}>{t('registration.phone')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.role')}</th>
+                  <th className={styles.tableHeadCell}>{t('segment.label')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.status')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.actions')}</th>
                 </tr>
               </thead>
               <tbody className={styles.tableBody}>
                 {users.map((user) => (
-                  <tr key={user.id} className={styles.tableRow}>
+                  <tr
+                    key={user.id}
+                    className={`${styles.tableRow} cursor-pointer`}
+                    onClick={() => navigate(adminUserDetailPath(user.id))}
+                  >
                     <td className={`${styles.tableCell} ${styles.tableCellName}`}>
                       {getDisplayName(user)}
                     </td>
@@ -245,23 +287,28 @@ export function AdminUsers() {
                     </td>
                     <td className={styles.tableCell}>
                       <Badge variant={user.role === 'teacher' ? 'primary' : 'secondary'}>
-                        {user.role === 'teacher' ? (
-                          <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1">
+                          {user.role === 'teacher' ? (
                             <TeacherIcon className="w-3 h-3" />
-                            {t('auth.teacher')}
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
+                          ) : (
                             <UsersIcon className="w-3 h-3" />
-                            {t('auth.student')}
-                          </span>
-                        )}
+                          )}
+                          {t(segmentationRules.getUserRoleLabel(user))}
+                        </span>
                       </Badge>
+                    </td>
+                    <td className={`${styles.tableCell} ${styles.tableCellMuted}`}>
+                      {user.segment
+                        ? t(`segment.${user.segment === 'non_arab_speakers' ? 'nonArabSpeakers' : user.segment}`)
+                        : '-'}
                     </td>
                     <td className={styles.tableCell}>
                       <StatusBadge status={user.status as 'active' | 'pending' | 'suspended'} />
                     </td>
-                    <td className={styles.tableCell}>
+                    <td
+                      className={styles.tableCell}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className={styles.actionsCell}>
                         {user.status === 'pending' && (
                           <Button

@@ -17,7 +17,8 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { supabase, db } from "../lib/supabase";
+import { supabase } from "../lib/supabase/client";
+import { api } from "../lib/supabase";
 import type { Profile, UserRole, AuthContextType, User } from "../types";
 import type { Session, AuthError } from "@supabase/supabase-js";
 
@@ -53,7 +54,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // State
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // Auth-session hydration flag (separate from profileLoading).
   const [loading, setLoading] = useState(true);
+  // Profile-fetch hydration flag. True whenever a `profiles` SELECT is in
+  // flight; false once the current attempt has resolved (regardless of
+  // whether it found a row). Guards use it to hold a spinner without
+  // blocking the auth session itself.
+  const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   // Recovery mode: set when user arrives via a password reset email link.
@@ -66,7 +73,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Refs to prevent race conditions
   const isInitializing = useRef(false);
-  const isFetchingProfile = useRef(false);
   // Mirrors isRecoverySession so the long-lived onAuthStateChange closure
   // always reads the current value without being recreated.
   const isRecoverySessionRef = useRef(isRecoverySession);
@@ -75,70 +81,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [isRecoverySession]);
 
   // ============================================
-  // Fetch Profile (with guards and retry for trigger delay)
+  // Fetch Profile — delegates to api.profiles.getById, which owns the
+  // trigger-delay retry loop and RLS-recursion short-circuit.
   // ============================================
   const fetchProfile = useCallback(
-    async (userId: string, retries = 3, delay = 500): Promise<Profile | null> => {
-      if (!userId || isFetchingProfile.current) {
+    async (userId: string): Promise<Profile | null> => {
+      if (!userId) return null;
+      logger.info("Fetching profile", { userId });
+      const { data, error: fetchError } = await api.profiles.getById(userId);
+      if (fetchError) {
+        logger.error("Profile fetch failed", fetchError);
         return null;
       }
-
-      isFetchingProfile.current = true;
-      logger.info("Fetching profile", { userId, retries });
-
-      try {
-        for (let attempt = 1; attempt <= retries; attempt++) {
-          try {
-            const { data, error: fetchError } = await db.profiles.get(userId);
-
-            if (fetchError) {
-              logger.error(`Profile fetch failed (attempt ${attempt})`, fetchError);
-              // If it's an RLS error (42P17), don't retry - it won't help
-              if ((fetchError as { code?: string }).code === "42P17") {
-                logger.error("RLS recursion error - check database policies");
-                return null;
-              }
-              // Wait before retry
-              if (attempt < retries) {
-                await new Promise((resolve) => setTimeout(resolve, delay));
-                continue;
-              }
-              return null;
-            }
-
-            if (data) {
-              logger.debug("Profile fetched successfully", {
-                profileId: data.id,
-                email: data.email,
-                role: data.role,
-                roleType: typeof data.role,
-                status: data.status,
-              });
-              return data;
-            }
-
-            // Profile not found - might be trigger delay
-            if (attempt < retries) {
-              logger.info(`Profile not found, retrying (${attempt}/${retries})`);
-              await new Promise((resolve) => setTimeout(resolve, delay));
-              continue;
-            }
-
-            logger.error("Profile not found after all retries");
-            return null;
-          } catch (err) {
-            logger.error(`Profile fetch exception (attempt ${attempt})`, err);
-            if (attempt < retries) {
-              await new Promise((resolve) => setTimeout(resolve, delay));
-              continue;
-            }
-            return null;
-          }
-        }
+      if (!data) {
+        logger.error("Profile not found after retries");
         return null;
-      } finally {
-        isFetchingProfile.current = false;
       }
+      return data;
     },
     [],
   );
@@ -153,6 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         logger.info("No session or user, clearing state");
         setUser(null);
         setProfile(null);
+        setProfileLoading(false);
         setLoading(false);
         return;
       }
@@ -160,12 +120,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const sessionUser = session.user;
       logger.info("Session user found", { userId: sessionUser.id });
 
+      // Announce the session immediately so guards stop blocking on auth.
+      // The profile fetch happens in the background below.
       setUser(sessionUser as unknown as User);
-
-      // Fetch profile
-      const userProfile = await fetchProfile(sessionUser.id);
-      setProfile(userProfile);
       setLoading(false);
+
+      setProfileLoading(true);
+      const userProfile = await fetchProfile(sessionUser.id);
+      // Never overwrite an already-loaded profile with null — a transient
+      // fetch failure here must not clobber a good profile set by a
+      // concurrent path (e.g. signIn). The "no profile" case is signaled
+      // by profileLoading flipping to false while profile stays null, and
+      // guards handle that explicitly.
+      if (userProfile) {
+        setProfile(userProfile);
+      }
+      setProfileLoading(false);
     },
     [fetchProfile],
   );
@@ -198,6 +168,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (isRecoverySessionRef.current && session?.user) {
           setUser(session.user as unknown as User);
           setProfile(null);
+          setProfileLoading(false);
           setLoading(false);
         } else {
           await handleSessionChange(session);
@@ -244,6 +215,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser(sessionUser as unknown as User);
               }
               setProfile(null);
+              setProfileLoading(false);
               setLoading(false);
               break;
 
@@ -251,8 +223,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             case "TOKEN_REFRESHED":
             case "USER_UPDATED":
               if (!sessionUser) {
-                // Defensive: an auth event can theoretically arrive with a
-                // null session. Treat it as a no-op rather than crashing.
                 logger.info(`${event} fired with null session — ignoring`);
                 break;
               }
@@ -269,6 +239,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               logger.info("User signed out, clearing state");
               setUser(null);
               setProfile(null);
+              setProfileLoading(false);
               setError(null);
               setIsRecoverySession(false);
               setLoading(false);
@@ -305,52 +276,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async (email: string, password: string) => {
       setError(null);
       setLoading(true);
+      setProfileLoading(true);
       logger.info("Attempting sign in", { email });
 
       try {
         const { data, error: signInError } =
-          await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
+          await supabase.auth.signInWithPassword({ email, password });
 
         if (signInError) {
           logger.error("Sign in failed", signInError);
           throw signInError;
         }
 
-        // CRITICAL: Guard against null user
         if (!data.user) {
           throw new Error("لم يتم إرجاع بيانات المستخدم");
         }
 
-        logger.info("/////Sign in successful", data.user);
+        logger.info("Sign in successful", { userId: data.user.id });
 
-        // Fetch profile
-        const userProfile = await fetchProfile(data.user.id);
-
-        if (!userProfile) {
-          logger.error("Profile not found after sign in");
-          await supabase.auth.signOut();
-          throw new Error("لم يتم العثور على الملف الشخصي");
-        }
-
-        // Check if account is active
-        if (userProfile.status !== "active") {
-          logger.info("Account not active", { status: userProfile.status });
-          await supabase.auth.signOut();
-          throw new Error("حسابك غير مفعل. يرجى انتظار موافقة الإدارة.");
-        }
-
-        // Set user from auth response (not user_metadata which may be stale)
+        // Set the session immediately so guards see `user` without waiting.
         setUser(data.user as unknown as User);
-        setProfile(userProfile);
 
-        logger.debug("Login complete - final state", {
-          userId: data.user.id,
-          profileRole: userProfile.role,
-          profileStatus: userProfile.status,
-        });
+        // Then resolve the profile inline. Awaiting here means the caller
+        // (Login.tsx) can safely navigate once `signIn` returns — by then
+        // both `user` and `profile` are populated in context, so
+        // DashboardDispatcher renders the target page on its first paint
+        // instead of showing a spinner that requires a refresh to break.
+        const userProfile = await fetchProfile(data.user.id);
+        if (userProfile) {
+          setProfile(userProfile);
+        }
 
         return { data, error: null };
       } catch (err) {
@@ -358,6 +313,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setError(errorMessage);
         return { data: null, error: err as Error };
       } finally {
+        setProfileLoading(false);
         setLoading(false);
       }
     },
@@ -373,28 +329,74 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       logger.info("Starting registration", { email, role: profileData.role });
 
+      // Lock language_type into a valid literal at the boundary. The form
+      // already normalizes; this is defense-in-depth so any future caller
+      // can't accidentally send undefined / null to Supabase and leave
+      // the column NULL.
+      const languageType =
+        profileData.language_type === 'non_arabic_speaker'
+          ? 'non_arabic_speaker'
+          : 'arabic_speaker';
+      logger.info("Registration language_type resolved", {
+        incoming: profileData.language_type,
+        persisted: languageType,
+      });
+
+      // Build the metadata payload as a single object so we can log the
+      // exact bytes Supabase will receive. This is the value that lands
+      // in `auth.users.raw_user_meta_data` and that the trigger reads.
+      // Field names here MUST match the column names the trigger expects
+      // — no transformation, no key renaming.
+      const signupMetadata = {
+        first_name: profileData.first_name || "",
+        second_name: profileData.second_name || "",
+        third_name: profileData.third_name || "",
+        phone: profileData.phone || "",
+        role: profileData.role || "student",
+        age: profileData.age,
+        country: profileData.country,
+        student_type: profileData.student_type,
+        memorization_level: profileData.memorization_level,
+        teaching_experience: profileData.teaching_experience,
+        preferred_audience: profileData.preferred_audience,
+        available_times: JSON.stringify(profileData.available_times || []),
+        // Segmentation + riwayah + teacher extensions (0005).
+        segment: profileData.segment,
+        recitation: profileData.recitation ?? undefined,
+        quran_parts_taught: profileData.quran_parts_taught ?? undefined,
+        is_certified: profileData.is_certified ?? false,
+        authorized_recitations: JSON.stringify(profileData.authorized_recitations || []),
+        // CRITICAL: key MUST be exactly `language_type`. The trigger reads
+        // raw_user_meta_data->>'language_type'. Any rename here breaks
+        // persistence silently. Defense-in-depth: `languageType` is
+        // normalized to a literal above, so this is always either
+        // 'arabic_speaker' or 'non_arabic_speaker' (never null/undefined).
+        language_type: languageType,
+      };
+
+      // Unmissable diagnostic printed with the exact label the product
+      // spec asked for. This is what `options.data` will be in the
+      // supabase.auth.signUp call immediately below — if `language_type`
+      // is missing from this log, it is missing from the network request
+      // and therefore missing from `raw_user_meta_data`.
+      console.log('SIGNUP META', signupMetadata);
+      // Also keep a structured log for server-log tooling.
+      logger.info("signUp metadata sent to Supabase", {
+        keys: Object.keys(signupMetadata),
+        language_type: signupMetadata.language_type,
+      });
+
       try {
-        // Create auth user with metadata
-        // The database trigger (handle_new_user) automatically creates the profile
+        // Create auth user with metadata. The database trigger
+        // (handle_new_user) reads from raw_user_meta_data and inserts
+        // into profiles. Whatever lands in `data` here lands in
+        // `auth.users.raw_user_meta_data` verbatim.
         const { data: authData, error: signUpError } =
           await supabase.auth.signUp({
             email,
             password,
             options: {
-              data: {
-                first_name: profileData.first_name || "",
-                second_name: profileData.second_name || "",
-                third_name: profileData.third_name || "",
-                phone: profileData.phone || "",
-                role: profileData.role || "student",
-                age: profileData.age,
-                country: profileData.country,
-                student_type: profileData.student_type,
-                memorization_level: profileData.memorization_level,
-                teaching_experience: profileData.teaching_experience,
-                preferred_audience: profileData.preferred_audience,
-                available_times: JSON.stringify(profileData.available_times || []),
-              },
+              data: signupMetadata,
             },
           });
 
@@ -414,11 +416,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Wait for trigger to create profile, then verify it exists
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const profile = await fetchProfile(userId, 3, 500);
+        // DIRECT WRITE — authoritative path for `language_type`.
+        // The handle_new_user trigger sometimes fires before
+        // raw_user_meta_data is fully populated, leaving language_type
+        // NULL. We no longer rely on it: we UPDATE the profile row
+        // ourselves with the normalized literal right after signup.
+        // The trigger remains as a fallback for the other fields; it
+        // will also set language_type if it can, but this UPDATE wins.
+        try {
+          const { error: langError } = await api.profiles.update(userId, {
+            language_type: languageType,
+          });
+          if (langError) {
+            logger.error("Direct language_type update failed", langError);
+          } else {
+            logger.info("language_type written directly", {
+              userId,
+              language_type: languageType,
+            });
+          }
+        } catch (langErr) {
+          logger.error("Direct language_type update threw", langErr);
+        }
+
+        const profile = await fetchProfile(userId);
         if (!profile) {
           logger.error("Profile not created by trigger - attempting manual creation");
           // Fallback: Try manual insert if trigger failed
-          const { error: profileError } = await db.profiles.create({
+          const { error: profileError } = await api.profiles.create({
             id: userId,
             email: email,
             first_name: profileData.first_name || "",
@@ -433,6 +458,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             teaching_experience: profileData.teaching_experience,
             preferred_audience: profileData.preferred_audience,
             available_times: profileData.available_times || [],
+            segment: profileData.segment,
+            recitation: profileData.recitation,
+            quran_parts_taught: profileData.quran_parts_taught,
+            is_certified: profileData.is_certified,
+            authorized_recitations: profileData.authorized_recitations,
+            language_type: languageType,
             status: "pending",
           });
 
@@ -561,7 +592,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logger.info("Updating profile", { userId: user.id });
 
       try {
-        const { data, error: updateError } = await db.profiles.update(
+        const { data, error: updateError } = await api.profiles.update(
           user.id,
           updates,
         );
@@ -618,6 +649,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     profile,
     loading,
+    profileLoading,
     error,
     signIn,
     signUp,

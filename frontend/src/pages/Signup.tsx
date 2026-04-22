@@ -4,6 +4,7 @@ import { AuthLayout, AuthCard } from '../components/templates/AuthLayout';
 import { Button } from '../components/atoms/Button';
 import { UsersIcon, TeacherIcon } from '../components/atoms/Icon';
 import { cn } from '../lib/utils';
+import { useTranslation } from '../locales/i18n';
 import type { IconProps } from '../types';
 
 interface AccountType {
@@ -19,21 +20,22 @@ interface AccountType {
  */
 export function Signup() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
   const accountTypes: AccountType[] = [
     {
       id: 'student',
-      label: 'طالبة',
+      label: t('auth.student'),
       icon: TeacherIcon,
-      description: 'التسجيل كطالبة لحفظ القرآن',
+      description: t('auth.studentDesc'),
       path: '/register/student',
     },
     {
       id: 'teacher',
-      label: 'معلمة',
+      label: t('auth.teacher'),
       icon: UsersIcon,
-      description: 'التسجيل كمعلمة لتدريس القرآن',
+      description: t('auth.teacherDesc'),
       path: '/register/teacher',
     },
   ];
@@ -48,8 +50,8 @@ export function Signup() {
 
   return (
     <AuthLayout
-      title="إنشاء حساب جديد"
-      subtitle="اختر نوع الحساب للمتابعة"
+      title={t('auth.createNewAccount')}
+      subtitle={t('auth.selectAccountType')}
     >
       <AuthCard>
         <div className="space-y-6">
@@ -88,7 +90,7 @@ export function Signup() {
             disabled={!selectedType}
             className={cn(!selectedType && 'opacity-60')}
           >
-            متابعة
+            {t('common.continue')}
           </Button>
 
           {/* Divider */}
@@ -100,9 +102,9 @@ export function Signup() {
 
           {/* Login link */}
           <p className="text-center text-sm text-muted">
-            لديك حساب بالفعل؟{' '}
-            <Link to="/" className="text-primary hover:underline">
-              تسجيل الدخول
+            {t('auth.haveAccount')}{' '}
+            <Link to="/login" className="text-primary hover:underline">
+              {t('auth.login')}
             </Link>
           </p>
         </div>

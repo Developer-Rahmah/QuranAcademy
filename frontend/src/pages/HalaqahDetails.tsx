@@ -16,6 +16,8 @@ import { ChartIcon, UsersIcon, SaveIcon, PlusIcon } from '../components/atoms/Ic
 import { useTranslation } from '../locales/i18n';
 import { getDisplayName } from '../lib/utils';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
+import { segmentationRules } from '../lib/segmentationRules';
+import { uiText } from '../lib/uiText';
 import type { StudentWithProgress } from '../types';
 
 interface HalaqahStats {
@@ -99,9 +101,16 @@ export function HalaqahDetails() {
 
   const isLoading = loadingHalaqah;
 
+  // Single derivation point for every gendered string on this page.
+  // Driven entirely by the halaqah's segment — never a hardcoded fallback.
+  const ui = segmentationRules.getGenderedUI({
+    role: 'teacher',
+    segment: halaqah?.segment,
+  });
+
   if (isLoading) {
     return (
-      <DashboardLayout title="تفاصيل الحلقة">
+      <DashboardLayout title={t(ui.halaqahLabel)}>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
@@ -111,7 +120,7 @@ export function HalaqahDetails() {
 
   if (!halaqah) {
     return (
-      <DashboardLayout title="تفاصيل الحلقة">
+      <DashboardLayout title={t(ui.halaqahLabel)}>
         <Card padding="lg">
           <p className="text-center text-muted py-8">الحلقة غير موجودة</p>
         </Card>
@@ -133,7 +142,7 @@ export function HalaqahDetails() {
             </Button>
             <Button onClick={() => setShowStudentAssignment(true)}>
               <PlusIcon className="w-4 h-4" />
-              {t('admin.manageStudents')}
+              {t(uiText.getManageStudentsLabel(halaqah?.segment))}
             </Button>
           </div>
         )}
@@ -164,43 +173,55 @@ export function HalaqahDetails() {
         {/* Progress Card */}
         <Card padding="md">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-muted">نسبة التقدم الإجمالية للحلقة</span>
+            <span className="text-sm text-muted">{t('halaqah.totalProgress')}</span>
             <ChartIcon className="w-5 h-5 text-primary" />
           </div>
           <ProgressBar value={halaqahStats.avgProgress} size="lg" showLabel />
           <p className="text-sm text-muted mt-2 text-center">
-            متوسط الحفظ: {halaqahStats.avgMemorization} صفحة لكل طالبة
+            {t('halaqah.avgMemorizationPer')} {halaqahStats.avgMemorization}{' '}
+            {t(`halaqah.pagesPerStudent${ui.pronoun === 'male' ? 'Male' : ui.pronoun === 'female' ? 'Female' : 'Neutral'}`)}
           </p>
         </Card>
 
-        {/* Statistics */}
+        {/* Statistics — titles and units come from the rule engine */}
         <StatCardRow>
           <StatCard
-            title="إجمالي الصفحات المحفوظة"
+            title={t('halaqah.totalMemorizedPages')}
             value={halaqahStats.totalMemorization}
             icon={SaveIcon}
-            subtitle="صفحة"
+            subtitle={t('halaqah.pageUnit')}
             variant="primary"
           />
           <StatCard
-            title="متوسط الحفظ للطالبة"
+            title={t(
+              `halaqah.avgMemorizationPerStudent${
+                ui.pronoun === 'male' ? 'Male' : ui.pronoun === 'female' ? 'Female' : 'Neutral'
+              }`,
+            )}
             value={halaqahStats.avgMemorization}
             icon={ChartIcon}
-            subtitle="صفحة"
+            subtitle={t('halaqah.pageUnit')}
           />
           <StatCard
-            title="عدد الطالبات"
+            title={t(
+              `halaqah.studentsCount${
+                ui.pronoun === 'male' ? 'Male' : ui.pronoun === 'female' ? 'Female' : 'Neutral'
+              }`,
+            )}
             value={students.length}
             icon={UsersIcon}
           />
         </StatCardRow>
 
         {/* Students Table */}
-        <PageSection title={`${t('student.title')} (${students.length})`}>
+        <PageSection
+          title={`${t(uiText.getStudentLabel(halaqah?.segment, 'plural'))} (${students.length})`}
+        >
           <StudentTable
             students={students}
             loading={loadingStudents}
             showReportsButton={false}
+            segment={halaqah?.segment}
           />
         </PageSection>
       </div>
@@ -217,6 +238,7 @@ export function HalaqahDetails() {
           <StudentAssignment
             halaqahId={halaqah.id}
             halaqahName={halaqah.name}
+            halaqah={halaqah}
             isOpen={showStudentAssignment}
             onClose={() => setShowStudentAssignment(false)}
             onSuccess={() => refetch?.()}

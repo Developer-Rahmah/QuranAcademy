@@ -26,3 +26,17 @@ export type { MeetLinkCardProps } from './MeetLinkCard';
 // ToggleGroup
 export { ToggleGroup } from './ToggleGroup';
 export type { ToggleGroupProps, ToggleOption, ToggleSize } from './ToggleGroup';
+
+// ContactInfo
+export { ContactInfo } from './ContactInfo';
+
+// PhoneField
+export { PhoneField, toE164, fromE164 } from './PhoneField';
+export type { PhoneFieldValue } from './PhoneField';
+
+// RecitationField
+export { RecitationField } from './RecitationField';
+
+// SocialLinks
+export { SocialLinks } from './SocialLinks';
+export type { SocialLinksVariant, SocialLinksSize } from './SocialLinks';

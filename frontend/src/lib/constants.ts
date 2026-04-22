@@ -1,4 +1,4 @@
-import type { TimeSlot, Surah, UserRole, StudentType, MemorizationLevel, PreferredAudience, AccountStatus, HalaqahStatus, ReportType } from '../types';
+import type { TimeSlot, Surah, UserRole, StudentType, MemorizationLevel, PreferredAudience, AccountStatus, HalaqahStatus, ReportType, UserSegment } from '../types';
 
 // Total pages in the Quran (Mushaf al-Madinah)
 export const TOTAL_QURAN_PAGES = 604;
@@ -53,21 +53,60 @@ export const REPORT_TYPES: Record<string, ReportType> = {
   REVIEW: 'review',
 };
 
-// Available time slots for halaqah sessions
-export const TIME_SLOTS: TimeSlot[] = [
-  { id: '08-09', label: '8:00 صباحاً - 9:00 صباحاً' },
-  { id: '09-10', label: '9:00 صباحاً - 10:00 صباحاً' },
-  { id: '10-11', label: '10:00 صباحاً - 11:00 صباحاً' },
-  { id: '11-12', label: '11:00 صباحاً - 12:00 ظهراً' },
-  { id: '13-14', label: '1:00 ظهراً - 2:00 ظهراً' },
-  { id: '14-15', label: '2:00 ظهراً - 3:00 ظهراً' },
-  { id: '15-16', label: '3:00 ظهراً - 4:00 ظهراً' },
-  { id: '16-17', label: '4:00 ظهراً - 5:00 مساءً' },
-  { id: '17-18', label: '5:00 مساءً - 6:00 مساءً' },
-  { id: '18-19', label: '6:00 مساءً - 7:00 مساءً' },
-  { id: '19-20', label: '7:00 مساءً - 8:00 مساءً' },
-  { id: '20-21', label: '8:00 مساءً - 9:00 مساءً' },
+// User segments (added in 0005). Default = 'women' for backward-compat.
+export const USER_SEGMENTS: Record<string, UserSegment> = {
+  WOMEN: 'women',
+  MEN: 'men',
+  CHILDREN: 'children',
+  NON_ARAB_SPEAKERS: 'non_arab_speakers',
+};
+
+/**
+ * Common qira'at/riwayat shown as dropdown suggestions. The dropdown always
+ * includes an "other" option — selecting it reveals a free-text field so any
+ * less-common riwayah name can still be submitted. NOT an enum in the DB.
+ */
+export const RECITATION_OPTIONS: ReadonlyArray<{ value: string; labelKey: string }> = [
+  { value: 'hafs',    labelKey: 'recitation.hafs' },
+  { value: 'warsh',   labelKey: 'recitation.warsh' },
+  { value: 'qalun',   labelKey: 'recitation.qalun' },
+  { value: 'aldoori', labelKey: 'recitation.aldoori' },
+  { value: 'alsoosi', labelKey: 'recitation.alsoosi' },
+  { value: 'shubah',  labelKey: 'recitation.shubah' },
 ];
+
+/** Sentinel value that the recitation UI uses to reveal the free-text input. */
+export const RECITATION_OTHER = 'other';
+
+/**
+ * Contact info rendered in the footer of AuthLayout (and anywhere else the
+ * brand surfaces). Values live here rather than in env so the marketing team
+ * can edit them via a PR rather than a secrets rotation.
+ */
+export const CONTACT_INFO = {
+  facebook:  'https://facebook.com/wahdaynakacademy',
+  instagram: 'https://instagram.com/wahdaynakacademy',
+  whatsapp:  '+966500000000',
+  email:     'contact@wahdaynak.academy',
+} as const;
+
+/**
+ * Academy timezone — all scheduling is interpreted in Mecca local time
+ * (Asia/Riyadh, UTC+3, no DST). Frontend labels are formatted to this TZ;
+ * backend stores slot ids as 24h strings (no tz metadata needed).
+ */
+export const ACADEMY_TIMEZONE = 'Asia/Riyadh';
+
+/**
+ * Full 24/7 availability grid. Each slot is a one-hour block labelled in
+ * 24-hour notation so it's language-neutral; Arabic/English copy formats
+ * these ids via locale helpers at render time.
+ */
+export const TIME_SLOTS: TimeSlot[] = Array.from({ length: 24 }, (_, h) => {
+  const start = String(h).padStart(2, '0');
+  const end = String((h + 1) % 24).padStart(2, '0');
+  return { id: `${start}-${end}`, label: `${start}:00 - ${end}:00` };
+});
 
 // List of all Surahs in the Quran
 export const SURAHS: Surah[] = [

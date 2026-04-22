@@ -111,25 +111,25 @@ export function AdminDashboard() {
           {/* Statistics Cards */}
           <StatCardRow>
             <StatCard
-              title="إجمالي الطلاب"
+              title={t('academy.totalStudents')}
               value={stats.totalStudents}
               icon={UsersIcon}
             />
             <StatCard
-              title="إجمالي المعلمين"
+              title={t('academy.totalTeachers')}
               value={stats.totalTeachers}
               icon={TeacherIcon}
             />
             <StatCard
-              title="إجمالي الحلقات"
+              title={t('academy.totalHalaqahs')}
               value={stats.totalHalaqahs}
               icon={BookIcon}
             />
             <StatCard
-              title="نسبة الحفظ الإجمالية"
+              title={t('academy.overallMemorization')}
               value={`${totalProgress.percentage}%`}
               progress={totalProgress.percentage}
-              progressLabel={`${totalProgress.memorized} من ${TOTAL_QURAN_PAGES} صفحة`}
+              progressLabel={`${totalProgress.memorized} ${t('academy.pagesOutOf')} ${TOTAL_QURAN_PAGES}`}
             />
           </StatCardRow>
 
@@ -146,6 +146,11 @@ export function AdminDashboard() {
               <Button size="lg" variant="outline">
                 <UsersIcon className="w-5 h-5" />
                 {t('admin.viewUsers')}
+              </Button>
+            </Link>
+            <Link to="/admin/settings">
+              <Button size="lg" variant="outline">
+                {t('adminSettings.title')}
               </Button>
             </Link>
           </div>

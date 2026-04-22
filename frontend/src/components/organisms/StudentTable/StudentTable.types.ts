@@ -13,6 +13,12 @@ export interface StudentTableProps {
   loading?: boolean;
   showReportsButton?: boolean;
   onViewReports?: (student: StudentWithProgress) => void;
+  /**
+   * Gender context for the table. Drives the empty-state copy via
+   * `uiText.getEmptyStateText('student', segment)`. Optional — when
+   * omitted the neutral copy is shown.
+   */
+  segment?: string | null;
 }
 
 export interface StudentCardProps {

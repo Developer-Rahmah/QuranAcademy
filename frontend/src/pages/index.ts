@@ -1,4 +1,5 @@
 // Pages - Complete page components
+export { Landing } from './Landing';
 export { Login } from './Login';
 export { Signup } from './Signup';
 export { ForgotPassword } from './ForgotPassword';
@@ -10,5 +11,7 @@ export { StudentDashboard } from './StudentDashboard';
 export { TeacherDashboard } from './TeacherDashboard';
 export { AdminDashboard } from './AdminDashboard';
 export { AdminUsers } from './AdminUsers';
+export { AdminUserDetail } from './AdminUserDetail';
+export { AdminSettings } from './AdminSettings';
 export { HalaqahDetails } from './HalaqahDetails';
 export { AddReport } from './AddReport';
