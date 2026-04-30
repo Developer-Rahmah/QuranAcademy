@@ -1,8 +1,8 @@
-import { DashboardLayout } from '../components/templates/DashboardLayout';
-import { ReportForm } from '../components/organisms/ReportForm';
+import { DashboardLayout } from "../components/templates/DashboardLayout";
+import { ReportForm } from "../components/organisms/ReportForm";
 
 /**
- * Add Report Page - Form to submit a new daily report
+ *  Add Report Page - Form to submit a new daily report
  */
 export function AddReport() {
   return (
