@@ -94,7 +94,13 @@ async function getById(
 }
 
 async function list(filters: ProfilesFilters = {}): Promise<ListResult<Profile>> {
-  let query = supabase.from('profiles').select('*');
+  // Cast the query builder through `any` for filter-by-role: the
+  // generated `UserRoleDb` union is narrower than the runtime `UserRole`
+  // (extended with halaqah_supervisor + supervisor_manager via 0009 —
+  // generated types haven't been regenerated yet). Once `supabase gen
+  // types` is re-run, this can return to a strict typed builder.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = supabase.from('profiles').select('*');
   if (filters.role)   query = query.eq('role', filters.role);
   if (filters.status) query = query.eq('status', filters.status);
   const { data, error } = await query.order('created_at', { ascending: false });

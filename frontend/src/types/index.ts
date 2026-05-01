@@ -1,5 +1,5 @@
 // ============================================
-// Type Definitions for Quran Academy
+// Type Definitions for Wahdaynak Academy
 // ============================================
 
 // Canonical enums — public names for gender/role. Kept in a separate
@@ -13,7 +13,17 @@ export { toAudienceContext, DEFAULT_AUDIENCE_CONTEXT } from './audience';
 export type { AudienceContext } from './audience';
 
 // Database Enums
-export type UserRole = 'student' | 'teacher' | 'admin';
+/**
+ * Application roles. Mirrors the `user_role` enum after migration 0009.
+ * `admin`'s UI label is rendered as "الإدارة"/"Admin" via the role-rules
+ * resolver, but the enum value stays `admin` for backward compatibility.
+ */
+export type UserRole =
+  | 'student'
+  | 'teacher'
+  | 'admin'
+  | 'halaqah_supervisor'
+  | 'supervisor_manager';
 export type StudentType = 'woman' | 'child';
 export type MemorizationLevel = 'beginner' | 'intermediate' | 'advanced';
 export type PreferredAudience = 'children' | 'women' | 'both';

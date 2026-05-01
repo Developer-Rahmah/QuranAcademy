@@ -40,3 +40,6 @@ export { RecitationField } from './RecitationField';
 // SocialLinks
 export { SocialLinks } from './SocialLinks';
 export type { SocialLinksVariant, SocialLinksSize } from './SocialLinks';
+
+// DashboardViewSwitcher
+export { DashboardViewSwitcher } from './DashboardViewSwitcher';

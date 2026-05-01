@@ -127,15 +127,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setProfileLoading(true);
       const userProfile = await fetchProfile(sessionUser.id);
-      // Never overwrite an already-loaded profile with null — a transient
-      // fetch failure here must not clobber a good profile set by a
-      // concurrent path (e.g. signIn). The "no profile" case is signaled
-      // by profileLoading flipping to false while profile stays null, and
-      // guards handle that explicitly.
       if (userProfile) {
         setProfile(userProfile);
+        setProfileLoading(false);
+        return;
       }
+
+      // Session is valid but no profile row exists for this user. That's
+      // an unrecoverable state for the app (RLS blocked, deleted profile,
+      // schema drift). Force a clean logout so the next paint shows the
+      // login screen rather than a half-authenticated shell.
+      logger.error(
+        "Session present but profile missing — forcing signOut",
+        { userId: sessionUser.id },
+      );
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        logger.error("Force signOut after missing profile failed", err);
+      }
+      setUser(null);
+      setProfile(null);
       setProfileLoading(false);
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+      } catch {
+        /* storage clear is best-effort */
+      }
     },
     [fetchProfile],
   );
@@ -501,15 +522,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logger.info("Signing out");
 
     try {
-      // Clear state FIRST
-      setUser(null);
-      setProfile(null);
-
+      // 1. Tell Supabase to revoke the session (server-side + cookies).
       const { error: signOutError } = await supabase.auth.signOut();
-
       if (signOutError) {
         logger.error("Sign out error", signOutError);
-        // Don't throw - state is already cleared
+        // Don't throw — we still want to wipe local state below.
+      }
+
+      // 2. Clear in-memory React state.
+      setUser(null);
+      setProfile(null);
+      setIsRecoverySession(false);
+
+      // 3. Wipe browser storage. Supabase persists the session JWT in
+      //    localStorage; without this step a remembered "supabase.auth.token"
+      //    can rehydrate on next app load and the user appears logged-in
+      //    again. We also nuke sessionStorage for parity.
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+      } catch (storageErr) {
+        // Quota / privacy-mode failures shouldn't block the logout flow.
+        logger.error("Storage clear failed during signOut", storageErr);
       }
 
       logger.info("Sign out complete");

@@ -79,6 +79,17 @@ export const RECITATION_OPTIONS: ReadonlyArray<{ value: string; labelKey: string
 export const RECITATION_OTHER = 'other';
 
 /**
+ * Resolve a stored recitation value (canonical id like 'hafs', or any
+ * free-text "other" label) into a translation KEY. Free-text values have
+ * no key — the caller should fall through to rendering the raw value.
+ */
+export function recitationLabelKeyFor(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = RECITATION_OPTIONS.find((o) => o.value === value);
+  return match ? match.labelKey : null;
+}
+
+/**
  * Contact info rendered in the footer of AuthLayout (and anywhere else the
  * brand surfaces). Values live here rather than in env so the marketing team
  * can edit them via a PR rather than a secrets rotation.
@@ -267,11 +278,14 @@ export const COUNTRIES: string[] = [
   'أخرى',
 ];
 
-// Arabic labels for roles
+// Legacy Arabic labels kept for any non-i18n consumers; prefer
+// `getRoleLabel` from lib/domain/roleRules for live UI.
 export const ROLE_LABELS: Record<UserRole, string> = {
   student: 'طالبة',
   teacher: 'معلمة',
-  admin: 'مدير النظام',
+  admin: 'الإدارة',
+  halaqah_supervisor: 'مشرف/ة الحلقة',
+  supervisor_manager: 'مدير المشرفين',
 };
 
 // Arabic labels for student types
