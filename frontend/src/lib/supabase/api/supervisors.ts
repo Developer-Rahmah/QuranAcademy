@@ -15,6 +15,7 @@
  */
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '../client';
+import { withTimeout } from '../withTimeout';
 
 /**
  * Row shape — matches `halaqah_supervisors` columns. The `user_id` /
@@ -87,11 +88,29 @@ async function listByUser(userId: string): Promise<ListResult<HalaqahSupervisorR
 
   console.log('FETCH SUPERVISOR ASSIGNMENTS START', userId);
 
-  // Query is exactly as spec: select all columns, filter by user_id.
-  const { data, error } = await client
-    .from('halaqah_supervisors')
-    .select('*')
-    .eq('user_id', userId);
+  // Hard timeout — production saw the dashboard hang for ~30s on this
+  // query when supabase-js silently stalled. We'd rather the user see
+  // an empty supervisor state immediately than block the whole
+  // dashboard render behind a hung fetch.
+  let data: HalaqahSupervisorRow[] | null = null;
+  let error: PostgrestError | Error | null = null;
+  try {
+    const queryPromise: Promise<{
+      data: unknown;
+      error: PostgrestError | null;
+    }> = Promise.resolve(
+      client.from('halaqah_supervisors').select('*').eq('user_id', userId),
+    );
+    const res = await withTimeout(
+      queryPromise,
+      5000,
+      `supervisors.listByUser(${userId})`,
+    );
+    data = (res.data as HalaqahSupervisorRow[]) ?? null;
+    error = res.error;
+  } catch (err) {
+    error = err as Error;
+  }
 
   console.log('FETCH RESULT', { data, error });
 
@@ -99,7 +118,7 @@ async function listByUser(userId: string): Promise<ListResult<HalaqahSupervisorR
     console.error('FETCH SUPERVISOR ASSIGNMENTS ERROR', error);
   }
 
-  return { data: (data as HalaqahSupervisorRow[]) ?? null, error };
+  return { data, error };
 }
 
 /**
