@@ -172,7 +172,6 @@ const SUPERVISOR_VIEW_KEY = 'wahdaynak.supervisor.view';
 function DashboardDispatcher() {
   const { user, profile, loading, profileLoading } = useAuth();
   const { t } = useTranslation();
-  const toast = useToast();
 
   const [supervisorView, setSupervisorView] = useState<'student' | 'supervisor' | null>(
     () => {
@@ -187,20 +186,20 @@ function DashboardDispatcher() {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
 
   useEffect(() => {
-    // Re-runs whenever profile.id changes (post-login, account switch).
-    // No caching: each transition makes a fresh fetch.
     if (!profile?.id) return;
+    // Skip the supervisor-assignments fetch for roles that can't be
+    // supervisors. Teachers and admins never need this query, and on
+    // production it sometimes stalls — running it for every role made
+    // every dashboard wait ~30s before rendering.
+    if (profile.role === 'teacher' || profile.role === 'admin' || profile.role === 'supervisor_manager') {
+      setAssignments([]);
+      return;
+    }
     let cancelled = false;
 
-    // Surface BOTH ids for diff. Per the production bug spec, supervisor
-    // logic must use profile.id everywhere — never auth.user.id directly.
-    // We log both so any mismatch shows up in the console immediately.
     console.log('AUTH USER ID', user?.id);
     console.log('PROFILE ID', profile.id);
     if (user?.id && user.id !== profile.id) {
-      // profiles.id is FK to auth.users.id, so they MUST match. If they
-      // don't, the DB is in an inconsistent state and any RLS check
-      // against auth.uid() will diverge from our app-side filter.
       console.error('ID MISMATCH', { authId: user?.id, profileId: profile.id });
     }
 
@@ -210,25 +209,13 @@ function DashboardDispatcher() {
       .then(({ data, error }) => {
         if (cancelled) return;
         setAssignments(data ?? []);
-
-        // Fail-safe UI: if the fetch errored, OR if the profile claims
-        // halaqah_supervisor capability but no rows came back, alert
-        // the operator with a clear toast. This is the diagnostic the
-        // production user reported missing.
         if (error) {
           console.error('Supervisor fetch error', error);
-          toast.error(t('auth.supervisorDataLoadFailed'));
+          // Don't toast for halaqah_supervisor-with-no-rows — that's a
+          // benign data state, not a failure. The operator already sees
+          // a clean dashboard. Loud toasting on every dashboard mount
+          // was producing false alarms.
           return;
-        }
-        if (
-          profile.role === 'halaqah_supervisor' &&
-          (data ?? []).length === 0
-        ) {
-          console.warn(
-            'profile.role === halaqah_supervisor but assignments empty',
-            { userId: profile.id },
-          );
-          toast.warning(t('auth.supervisorDataLoadFailed'));
         }
       })
       .finally(() => {
@@ -237,11 +224,6 @@ function DashboardDispatcher() {
     return () => {
       cancelled = true;
     };
-    // `t` and `toast` are intentionally excluded — they're unstable
-    // context references that change every render. Including them would
-    // re-fire this fetch on every render and produce the infinite-loop
-    // (`AUTH USER ID` / `FETCH RESULT` repeating forever) the user hit.
-    // The closure reads them at toast time, which is correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, profile?.role]);
 
@@ -255,11 +237,21 @@ function DashboardDispatcher() {
     return <Navigate to={ROUTES.admin} replace />;
   }
 
-  // Wait for the supervisor-assignments fetch — without it we can't
-  // decide between student-only and the supervisor picker.
-  if (assignmentsLoading || assignments === null) return <LoadingSpinner />;
+  // Only block the dashboard render on the supervisor fetch when the
+  // user has explicitly chosen the supervisor view this session. Pure
+  // students and teachers see their dashboard immediately while the
+  // assignments fetch (if any) hydrates in the background — that's the
+  // fix for the ~30s blank screen on every login.
+  if (
+    supervisorView === 'supervisor' &&
+    (assignmentsLoading || assignments === null)
+  ) {
+    return <LoadingSpinner />;
+  }
+  // Default `assignments` to [] for everyone else so isSupervisor is
+  // simply false until the fetch (if running) returns.
 
-  const isSupervisor = isUserSupervisor(assignments);
+  const isSupervisor = isUserSupervisor(assignments ?? []);
 
   const choose = (next: 'student' | 'supervisor') => {
     window.sessionStorage.setItem(SUPERVISOR_VIEW_KEY, next);

@@ -11,6 +11,7 @@
  */
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '../client';
+import { withTimeout } from '../withTimeout';
 import type { Profile, UserRole, AccountStatus } from '../../../types';
 
 export interface ProfilesFilters {
@@ -40,31 +41,6 @@ export interface GetProfileOptions {
 
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Wraps a promise in a hard timeout. Production has shown a class of
- * silent stalls where the supabase-js fetch never settles (browser
- * keep-alive, CDN edge oddities, RLS recursion). Without this wrapper
- * the dashboard spinner runs forever; with it, the caller gets a
- * timeout error after `ms` and can fall back / retry.
- */
-async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return await new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
-    }, ms);
-    p.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
 }
 
 /**
