@@ -99,8 +99,11 @@ export function submitStudentType(ui: StudentTypeUI | ''): StudentType | null {
 // ---------------- preferred_audience ----------------
 
 export function audienceOptionsForSegment(segment: UserSegment): PreferredAudienceUI[] {
-  if (segment === 'men') return ['men', 'children', 'both'];
-  if (segment === 'women') return ['women', 'children', 'both'];
+  // Gendered segments expose only matching-gender + children. 'both' is
+  // intentionally excluded so a men's teacher can't be flagged as
+  // teaching women, and vice versa.
+  if (segment === 'men') return ['men', 'children'];
+  if (segment === 'women') return ['women', 'children'];
   return ['children', 'women', 'both'];
 }
 

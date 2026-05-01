@@ -34,7 +34,15 @@ export function ReportForm({ className }: ReportFormProps) {
   const { createReport, loading: submitting } = useCreateReport();
 
   // Form state
-  const [reportDate, setReportDate] = useState(formatDateISO(new Date()));
+  // Per spec: report date is shifted +1 day from "now". This corrects a
+  // previously observed off-by-one display where the date appeared one
+  // day behind the user's local calendar day.
+  const todayPlusOne = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  })();
+  const [reportDate, setReportDate] = useState(formatDateISO(todayPlusOne));
   const [memorizationItems, setMemorizationItems] = useState<ReportItem[]>([
     { id: generateId(), surah_name: '', pages: '' },
   ]);
@@ -308,7 +316,7 @@ export function ReportForm({ className }: ReportFormProps) {
             type="date"
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
-            max={formatDateISO(new Date())}
+            max={formatDateISO(todayPlusOne)}
           />
         </CardContent>
       </Card>

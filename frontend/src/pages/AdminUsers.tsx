@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/supabase';
+import { supabase } from '../lib/supabase/client';
 import { adminUserDetailPath } from '../lib/routes';
 import { segmentationRules } from '../lib/segmentationRules';
 // AdminUsers is a MIXED context (admin manages everyone), so plural
@@ -16,7 +17,13 @@ import { Select } from '../components/atoms/Select';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { UsersIcon, TeacherIcon, CheckIcon } from '../components/atoms/Icon';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../locales/i18n';
+import {
+  canDeleteUsers,
+  canAssignRole as permsCanAssignRole,
+  isAdminOrSupervisorManager,
+} from '../lib/permissions';
 import type { Profile, UserRole, AccountStatus, UserSegment } from '../types';
 
 // ============================================
@@ -64,15 +71,60 @@ export function AdminUsers() {
   const { t } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
+  // Current viewer's role drives what role-change targets they're allowed
+  // to assign. Only admin can grant `supervisor_manager`; only admin can
+  // grant `admin` (supervisor_manager cannot escalate to admin).
+  const { profile: currentUser } = useAuth();
+  const viewerRole = currentUser?.role;
 
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [filters, setFilters] = useState<UserFilters>({
     role: 'all',
     status: 'all',
     segment: 'all',
   });
+
+  // Toggle a single row's selection.
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Bulk-delete the selected profiles. Two-step: confirm dialog → DELETE.
+  // Uses the supabase client directly because there's no `delete` method on
+  // the legacy `db.profiles` facade. RLS still applies — only admins /
+  // supervisor_managers should be able to actually run this.
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(t('admin.confirmDeleteSelected'))) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .in('id', ids);
+      if (error) {
+        console.error('Bulk delete error:', error);
+        toast.error(t('admin.deletedFailed'));
+        return;
+      }
+      toast.success(t('admin.deletedSuccess'));
+      setSelectedIds(new Set());
+      // Refetch — keeps the stat counts and rows consistent.
+      await fetchUsers();
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   // ============================================
   // Fetch Users
@@ -135,6 +187,44 @@ export function AdminUsers() {
     } catch (err) {
       console.error('Error updating user:', err);
       toast.error(t('errors.generic'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ============================================
+  // Update Profile Role
+  //
+  // Permission rules (enforced both client-side and server-side via RLS):
+  //   - admin             → can assign any role except itself to admin
+  //                         (we still allow it; server is the safety net)
+  //   - supervisor_manager → can assign student / teacher only.
+  //                         CANNOT promote to admin.
+  //   - everyone else     → cannot reach this code path (page is gated).
+  //
+  // `halaqah_supervisor` is intentionally NOT a target of this dropdown
+  // — supervisor status is relational and managed via halaqah_supervisors
+  // (HalaqahDetails). Updating profiles.role here would corrupt that.
+  // ============================================
+  // Centralized permission check — see lib/permissions.ts.
+  const canAssignRole = (target: UserRole): boolean =>
+    permsCanAssignRole(viewerRole, target);
+
+  const updateUserRole = async (userId: string, newRole: UserRole) => {
+    if (!canAssignRole(newRole)) {
+      toast.error(t('admin.notAuthorizedRoleAssignment'));
+      return;
+    }
+    setActionLoading(userId);
+    try {
+      const { error } = await db.profiles.update(userId, { role: newRole });
+      if (error) {
+        console.error('Error updating role:', error);
+        toast.error(t('admin.roleUpdateFailed'));
+        return;
+      }
+      toast.success(t('admin.roleUpdated'));
+      await fetchUsers();
     } finally {
       setActionLoading(null);
     }
@@ -245,6 +335,24 @@ export function AdminUsers() {
         </div>
       </div>
 
+      {/* Bulk action bar — admin only. supervisor_manager cannot delete
+          users per spec, so the action bar is hidden for them entirely. */}
+      {canDeleteUsers(viewerRole) && selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg bg-secondary/50 border border-border">
+          <span className="text-sm text-foreground">
+            {selectedIds.size} / {users.length}
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={deleteSelected}
+            loading={bulkDeleting}
+          >
+            {t('admin.deleteSelected')}
+          </Button>
+        </div>
+      )}
+
       {/* Users Table */}
       <PageSection title={t('admin.usersList')}>
         {loading ? (
@@ -260,6 +368,25 @@ export function AdminUsers() {
             <table className={styles.table}>
               <thead className={styles.tableHead}>
                 <tr>
+                  {canDeleteUsers(viewerRole) && (
+                    <th className={styles.tableHeadCell} style={{ width: '2.5rem' }}>
+                      <input
+                        type="checkbox"
+                        aria-label={t('admin.selectAll')}
+                        checked={
+                          users.length > 0 &&
+                          users.every((u) => selectedIds.has(u.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(new Set(users.map((u) => u.id)));
+                          } else {
+                            setSelectedIds(new Set());
+                          }
+                        }}
+                      />
+                    </th>
+                  )}
                   <th className={styles.tableHeadCell}>{t('admin.userName')}</th>
                   <th className={styles.tableHeadCell}>{t('auth.email')}</th>
                   <th className={styles.tableHeadCell}>{t('registration.phone')}</th>
@@ -276,6 +403,19 @@ export function AdminUsers() {
                     className={`${styles.tableRow} cursor-pointer`}
                     onClick={() => navigate(adminUserDetailPath(user.id))}
                   >
+                    {canDeleteUsers(viewerRole) && (
+                      <td
+                        className={styles.tableCell}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={t('admin.selectAll')}
+                          checked={selectedIds.has(user.id)}
+                          onChange={() => toggleSelected(user.id)}
+                        />
+                      </td>
+                    )}
                     <td className={`${styles.tableCell} ${styles.tableCellName}`}>
                       {getDisplayName(user)}
                     </td>
@@ -340,6 +480,39 @@ export function AdminUsers() {
                           >
                             {t('admin.reactivate')}
                           </Button>
+                        )}
+
+                        {/* Role-change dropdown. Visible only to viewers
+                            who can assign at least one role. Options are
+                            filtered to roles the viewer is allowed to
+                            grant, so a supervisor_manager never sees
+                            'admin' / 'supervisor_manager' in the menu. */}
+                        {isAdminOrSupervisorManager(viewerRole) && (
+                          <Select
+                            aria-label={t('admin.changeRole')}
+                            value={user.role}
+                            onChange={(e) => {
+                              const next = e.target.value as UserRole;
+                              if (next !== user.role) {
+                                void updateUserRole(user.id, next);
+                              }
+                            }}
+                            options={[
+                              { value: 'student', label: t('auth.student') },
+                              { value: 'teacher', label: t('auth.teacher') },
+                              ...(canAssignRole('admin')
+                                ? [{ value: 'admin', label: t('auth.admin') }]
+                                : []),
+                              ...(canAssignRole('supervisor_manager')
+                                ? [
+                                    {
+                                      value: 'supervisor_manager',
+                                      label: t('auth.supervisorManager'),
+                                    },
+                                  ]
+                                : []),
+                            ]}
+                          />
                         )}
                       </div>
                     </td>

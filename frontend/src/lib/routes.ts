@@ -35,10 +35,12 @@ export function adminUserDetailPath(userId: string): string {
 
 /**
  * Given a role, return the URL they should land on after login.
- * Admin gets a distinct URL; teacher and student share /dashboard
- * (the DashboardDispatcher renders the correct component there).
+ *
+ *   admin / supervisor_manager → /admin (admin dashboard)
+ *   everything else            → /dashboard (DashboardDispatcher
+ *                                resolves the right component there)
  */
 export function dashboardPathForRole(role: UserRole | string | undefined): string {
-  if (role === 'admin') return ROUTES.admin;
+  if (role === 'admin' || role === 'supervisor_manager') return ROUTES.admin;
   return ROUTES.dashboard;
 }

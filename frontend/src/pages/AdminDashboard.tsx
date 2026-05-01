@@ -10,6 +10,8 @@ import { HalaqahForm } from '../components/organisms/HalaqahForm';
 import { Button } from '../components/atoms/Button';
 import { UsersIcon, TeacherIcon, BookIcon, PlusIcon } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
+import { useAuth } from '../context/AuthContext';
+import { canManageSettings } from '../lib/permissions';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
 import type { HalaqahWithStats } from '../types';
 
@@ -18,6 +20,7 @@ import type { HalaqahWithStats } from '../types';
  */
 export function AdminDashboard() {
   const { t } = useTranslation();
+  const { profile } = useAuth();
   const { stats, loading: loadingStats, refetch: refetchStats } = useAcademyStats();
   const { halaqahs: rawHalaqahs, loading: loadingHalaqahs, refetch: refetchHalaqahs } = useHalaqahs();
 
@@ -148,11 +151,15 @@ export function AdminDashboard() {
                 {t('admin.viewUsers')}
               </Button>
             </Link>
-            <Link to="/admin/settings">
-              <Button size="lg" variant="outline">
-                {t('adminSettings.title')}
-              </Button>
-            </Link>
+            {/* Settings is admin-only. supervisor_manager cannot reach
+                /admin/settings (route guard) and shouldn't see the link. */}
+            {canManageSettings(profile?.role) && (
+              <Link to="/admin/settings">
+                <Button size="lg" variant="outline">
+                  {t('adminSettings.title')}
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Halaqahs Table */}

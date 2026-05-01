@@ -26,7 +26,6 @@ import { submitPreferredAudience } from '../../../lib/segment';
 import {
   segmentationRules,
 } from '../../../lib/segmentationRules';
-import { getAddressGenderLabelKey } from '../../../lib/domain/roleRules';
 import { UserSegment, type HalaqahSegment } from '../../../lib/enums';
 import { halaqahFormStyles as styles } from './HalaqahForm.style';
 import type { HalaqahFormProps, HalaqahFormData, HalaqahFormErrors } from './HalaqahForm.types';
@@ -300,16 +299,6 @@ export function HalaqahForm({
           {errors.segment && (
             <p className="text-sm text-destructive">{errors.segment}</p>
           )}
-
-          {/* Address language — read-only, derived directly from segment.
-              Makes the grammatical-gender rule explicit to the admin so
-              they know why the labels downstream read masculine/feminine. */}
-          <p className="text-sm text-muted">
-            {t('halaqah.addressLanguage')}:{' '}
-            <span className="font-medium text-foreground">
-              {t(getAddressGenderLabelKey(formData.segment))}
-            </span>
-          </p>
         </div>
 
         <FormField

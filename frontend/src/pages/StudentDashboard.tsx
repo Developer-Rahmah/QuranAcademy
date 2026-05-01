@@ -9,6 +9,7 @@ import {
 import { Card } from "../components/molecules/Card";
 import { StatCard, StatCardRow } from "../components/molecules/StatCard";
 import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
+import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwitcher";
 import { Button } from "../components/atoms/Button";
 import { SaveIcon, RefreshIcon, PlusIcon } from "../components/atoms/Icon";
 import { getDisplayName } from "../lib/utils";
@@ -37,6 +38,9 @@ export function StudentDashboard() {
       title={t('dashboard.studentWelcome')}
       subtitle={t('dashboard.studentSubtitle')}
     >
+      {/* Dual-role accounts (student + supervisor) get a top-level
+          view switcher. Renders nothing for pure students. */}
+      <DashboardViewSwitcher />
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />

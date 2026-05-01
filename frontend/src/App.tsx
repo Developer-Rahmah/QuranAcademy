@@ -14,13 +14,16 @@
  * role as soon as the profile hydrates (asynchronously) to redirect to the
  * role-specific home.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { DashboardViewProvider } from './context/DashboardViewContext';
 import { I18nProvider, useTranslation } from './locales/i18n';
 import { ROUTES, dashboardPathForRole } from './lib/routes';
+import { api } from './lib/supabase';
+import { isUserSupervisor } from './lib/permissions';
 import {
   Landing,
   Login,
@@ -32,6 +35,7 @@ import {
   TeacherRegistration,
   StudentDashboard,
   TeacherDashboard,
+  SupervisorDashboard,
   AdminDashboard,
   AdminUsers,
   AdminUserDetail,
@@ -158,24 +162,191 @@ function PublicRoute({ children }: PublicRouteProps) {
 //   - teacher → render TeacherDashboard
 //   - student → render StudentDashboard
 // ============================================
+/**
+ * Storage key for the active "view" the user has chosen this session
+ * when they hold both student and supervisor capabilities. Cleared on
+ * logout (which wipes sessionStorage).
+ */
+const SUPERVISOR_VIEW_KEY = 'wahdaynak.supervisor.view';
+
 function DashboardDispatcher() {
   const { user, profile, loading, profileLoading } = useAuth();
+  const { t } = useTranslation();
+  const toast = useToast();
 
-  // Hold a spinner only while auth is hydrating OR a profile fetch is
-  // actually in flight. Critically, don't spin forever if the profile
-  // fetch completed but returned null (trigger race / RLS); in that
-  // case fall through to the redirect below. This was the "stuck after
-  // login" bug.
+  const [supervisorView, setSupervisorView] = useState<'student' | 'supervisor' | null>(
+    () => {
+      if (typeof window === 'undefined') return null;
+      const v = window.sessionStorage.getItem(SUPERVISOR_VIEW_KEY);
+      return v === 'student' || v === 'supervisor' ? v : null;
+    },
+  );
+
+  // Halaqah supervisor assignments — RELATIONAL source of truth.
+  const [assignments, setAssignments] = useState<Array<{ halaqah_id: string }> | null>(null);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+
+  useEffect(() => {
+    // Re-runs whenever profile.id changes (post-login, account switch).
+    // No caching: each transition makes a fresh fetch.
+    if (!profile?.id) return;
+    let cancelled = false;
+
+    // Surface BOTH ids for diff. Per the production bug spec, supervisor
+    // logic must use profile.id everywhere — never auth.user.id directly.
+    // We log both so any mismatch shows up in the console immediately.
+    console.log('AUTH USER ID', user?.id);
+    console.log('PROFILE ID', profile.id);
+    if (user?.id && user.id !== profile.id) {
+      // profiles.id is FK to auth.users.id, so they MUST match. If they
+      // don't, the DB is in an inconsistent state and any RLS check
+      // against auth.uid() will diverge from our app-side filter.
+      console.error('ID MISMATCH', { authId: user?.id, profileId: profile.id });
+    }
+
+    setAssignmentsLoading(true);
+    void api.supervisors
+      .listByUser(profile.id)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setAssignments(data ?? []);
+
+        // Fail-safe UI: if the fetch errored, OR if the profile claims
+        // halaqah_supervisor capability but no rows came back, alert
+        // the operator with a clear toast. This is the diagnostic the
+        // production user reported missing.
+        if (error) {
+          console.error('Supervisor fetch error', error);
+          toast.error(t('auth.supervisorDataLoadFailed'));
+          return;
+        }
+        if (
+          profile.role === 'halaqah_supervisor' &&
+          (data ?? []).length === 0
+        ) {
+          console.warn(
+            'profile.role === halaqah_supervisor but assignments empty',
+            { userId: profile.id },
+          );
+          toast.warning(t('auth.supervisorDataLoadFailed'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAssignmentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // `t` and `toast` are intentionally excluded — they're unstable
+    // context references that change every render. Including them would
+    // re-fire this fetch on every render and produce the infinite-loop
+    // (`AUTH USER ID` / `FETCH RESULT` repeating forever) the user hit.
+    // The closure reads them at toast time, which is correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, profile?.role]);
+
   if (loading) return <LoadingSpinner />;
   if (user && !profile && profileLoading) return <LoadingSpinner />;
   if (!profile) return <Navigate to={ROUTES.login} replace />;
 
-  // Admin has a distinct URL. Teacher/student render inline, wrapped in
-  // RoleGuard so the active-status check + sign-out-on-inactive behavior
-  // is identical to every other role-gated route.
+  // Admin / supervisor_manager paths short-circuit straight to /admin.
+  // No supervisor logic applies to them.
+  if (profile.role === 'admin' || profile.role === 'supervisor_manager') {
+    return <Navigate to={ROUTES.admin} replace />;
+  }
+
+  // Wait for the supervisor-assignments fetch — without it we can't
+  // decide between student-only and the supervisor picker.
+  if (assignmentsLoading || assignments === null) return <LoadingSpinner />;
+
+  const isSupervisor = isUserSupervisor(assignments);
+
+  const choose = (next: 'student' | 'supervisor') => {
+    window.sessionStorage.setItem(SUPERVISOR_VIEW_KEY, next);
+    setSupervisorView(next);
+  };
+  const clearChoice = () => {
+    window.sessionStorage.removeItem(SUPERVISOR_VIEW_KEY);
+    setSupervisorView('student');
+  };
+
+  // Empty-state guard: a user who chose "supervisor" but has no
+  // assignments (e.g. assignments revoked between sessions, or admin
+  // toggled profile.role manually). Show a clear message + a button to
+  // fall back to the student dashboard. Never blank screen.
+  if (supervisorView === 'supervisor' && !isSupervisor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 max-w-md w-full text-center space-y-4">
+          <p className="text-base text-foreground">
+            {t('auth.noHalaqahsToSupervise')}
+          </p>
+          <button
+            type="button"
+            onClick={clearChoice}
+            className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition"
+          >
+            {t('auth.backToStudent')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Picker: only when the user actually IS a supervisor (has assignments)
+  // AND hasn't chosen yet this session. Otherwise we skip straight to
+  // their student/teacher dashboard.
+  if (isSupervisor && !supervisorView) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 max-w-md w-full text-center space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">
+            {t('auth.supervisorRoleQuestion')}
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={() => choose('student')}
+              className="flex-1 px-4 py-3 rounded-lg border border-border bg-card text-foreground hover:bg-secondary transition"
+            >
+              {t('auth.continueAsStudent')}
+            </button>
+            <button
+              type="button"
+              onClick={() => choose('supervisor')}
+              className="flex-1 px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition"
+            >
+              {t('auth.continueAsSupervisor')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // `canSwitch` enables the in-dashboard view toggle. True only when the
+  // account is BOTH supervisor (has assignments) AND able to act as a
+  // student (i.e. not a teacher — teachers don't need this switcher).
+  // Teachers fall through to TeacherDashboard with no switcher exposed.
+  const canSwitch = isSupervisor && profile.role !== 'teacher';
+  const viewValue: 'student' | 'supervisor' =
+    supervisorView === 'supervisor' ? 'supervisor' : 'student';
+
+  // Active supervisor session — dedicated read-only dashboard. NOT the
+  // TeacherDashboard: a halaqah supervisor has different responsibilities
+  // (oversight, no edit) and the UI must reflect that.
+  if (isSupervisor && supervisorView === 'supervisor') {
+    return (
+      <DashboardViewProvider value={{ view: viewValue, switchTo: choose, canSwitch }}>
+        <SupervisorDashboard />
+      </DashboardViewProvider>
+    );
+  }
+
+  // Default rendering by primary role. profile.role === 'halaqah_supervisor'
+  // with no assignments is treated as a regular student per the spec
+  // (data drift / cleanup case). Teacher and student fall through here.
   switch (profile.role) {
-    case 'admin':
-      return <Navigate to={ROUTES.admin} replace />;
     case 'teacher':
       return (
         <RoleGuard allow="teacher">
@@ -183,10 +354,13 @@ function DashboardDispatcher() {
         </RoleGuard>
       );
     case 'student':
+    case 'halaqah_supervisor':
     default:
       return (
-        <RoleGuard allow="student">
-          <StudentDashboard />
+        <RoleGuard allow={['student', 'halaqah_supervisor']}>
+          <DashboardViewProvider value={{ view: viewValue, switchTo: choose, canSwitch }}>
+            <StudentDashboard />
+          </DashboardViewProvider>
         </RoleGuard>
       );
   }
@@ -225,7 +399,7 @@ function AppRoutes() {
         path={ROUTES.admin}
         element={
           <AuthGuard>
-            <RoleGuard allow="admin">
+            <RoleGuard allow={['admin', 'supervisor_manager']}>
               <AdminDashboard />
             </RoleGuard>
           </AuthGuard>
@@ -235,7 +409,7 @@ function AppRoutes() {
         path={ROUTES.adminUsers}
         element={
           <AuthGuard>
-            <RoleGuard allow="admin">
+            <RoleGuard allow={['admin', 'supervisor_manager']}>
               <AdminUsers />
             </RoleGuard>
           </AuthGuard>
@@ -245,7 +419,7 @@ function AppRoutes() {
         path={ROUTES.adminUserDetail}
         element={
           <AuthGuard>
-            <RoleGuard allow="admin">
+            <RoleGuard allow={['admin', 'supervisor_manager']}>
               <AdminUserDetail />
             </RoleGuard>
           </AuthGuard>
@@ -255,6 +429,8 @@ function AppRoutes() {
         path={ROUTES.adminSettings}
         element={
           <AuthGuard>
+            {/* Settings stays admin-only. supervisor_manager cannot
+                change academy settings (per spec). */}
             <RoleGuard allow="admin">
               <AdminSettings />
             </RoleGuard>
@@ -265,7 +441,7 @@ function AppRoutes() {
         path={ROUTES.halaqahDetails}
         element={
           <AuthGuard>
-            <RoleGuard allow={['admin', 'teacher']}>
+            <RoleGuard allow={['admin', 'teacher', 'supervisor_manager', 'halaqah_supervisor']}>
               <HalaqahDetails />
             </RoleGuard>
           </AuthGuard>
@@ -275,7 +451,12 @@ function AppRoutes() {
         path={ROUTES.reportNew}
         element={
           <AuthGuard>
-            <RoleGuard allow="student">
+            {/* halaqah_supervisor is included because a user can be BOTH
+                a student and a supervisor — the relational supervisor row
+                does not strip their student capability. The dispatcher
+                already treats a supervisor in `student` view as a regular
+                student, so the route must let them through. */}
+            <RoleGuard allow={['student', 'halaqah_supervisor']}>
               <AddReport />
             </RoleGuard>
           </AuthGuard>

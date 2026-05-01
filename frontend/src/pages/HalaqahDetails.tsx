@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useHalaqah } from '../hooks/useHalaqah';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../lib/supabase';
+import { useToast } from '../context/ToastContext';
+import { db, api } from '../lib/supabase';
+import type { HalaqahSupervisorWithProfile } from '../lib/supabase/api/supervisors';
 import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
 import { Card } from '../components/molecules/Card';
 import { StatCard, StatCardRow } from '../components/molecules/StatCard';
@@ -18,6 +20,7 @@ import { getDisplayName } from '../lib/utils';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
 import { segmentationRules } from '../lib/segmentationRules';
 import { uiText } from '../lib/uiText';
+import { canManageHalaqah, canManageSupervisors } from '../lib/permissions';
 import type { StudentWithProgress } from '../types';
 
 interface HalaqahStats {
@@ -32,7 +35,26 @@ interface HalaqahStats {
 export function HalaqahDetails() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
+  const { user, profile } = useAuth();
+  const toast = useToast();
+
+  // Auth-vs-profile id integrity check. The supervisor APIs use
+  // profile.id everywhere; if the auth user id ever diverges from the
+  // profile id, RLS checks (which run against auth.uid()) and our
+  // queries will disagree. Log loudly so the diff is visible.
+  useEffect(() => {
+    if (user?.id && profile?.id && user.id !== profile.id) {
+      console.error('ID MISMATCH (HalaqahDetails)', {
+        authId: user.id,
+        profileId: profile.id,
+      });
+    }
+  }, [user?.id, profile?.id]);
+  // Centralized capability checks — see lib/permissions.ts. admin and
+  // supervisor_manager both manage halaqahs (CRUD + students + assigning
+  // halaqah supervisors). Other roles never see the management UI.
+  const canManage = canManageHalaqah(profile?.role);
+  const canManageSupervisorList = canManageSupervisors(profile?.role);
   const { halaqah, members, loading: loadingHalaqah, refetch } = useHalaqah(id);
 
   const [students, setStudents] = useState<StudentWithProgress[]>([]);
@@ -44,6 +66,79 @@ export function HalaqahDetails() {
   });
   const [showEditForm, setShowEditForm] = useState(false);
   const [showStudentAssignment, setShowStudentAssignment] = useState(false);
+
+  // Supervisor assignments for this halaqah. The set of `user_id`s drives
+  // the per-student "Assign / Remove" toggle.
+  const [supervisors, setSupervisors] = useState<HalaqahSupervisorWithProfile[]>([]);
+  const [loadingSupervisors, setLoadingSupervisors] = useState(false);
+  const [supervisorActionId, setSupervisorActionId] = useState<string | null>(null);
+
+  const fetchSupervisors = useCallback(async () => {
+    if (!id) return;
+    setLoadingSupervisors(true);
+    const { data, error } = await api.supervisors.listByHalaqah(id);
+    if (!error) setSupervisors(data ?? []);
+    setLoadingSupervisors(false);
+  }, [id]);
+
+  useEffect(() => {
+    void fetchSupervisors();
+  }, [fetchSupervisors]);
+
+  // O(1) lookup: is this user already a supervisor of this halaqah?
+  const supervisorIds = new Set(supervisors.map((s) => s.user_id));
+
+  // Membership lookup: only students currently in this halaqah are
+  // eligible for supervisor assignment (per spec).
+  const memberIds = new Set((members ?? []).map((m) => m.student_id));
+
+  const handleAssign = async (userId: string) => {
+    if (!id) return;
+    if (!userId) {
+      console.error('handleAssign called without userId');
+      toast.error(t('admin.supervisorAssignFailed'));
+      return;
+    }
+    setSupervisorActionId(userId);
+    try {
+      // assign() throws on failure (RLS denial, network, etc.) so we can
+      // surface the real underlying message rather than a generic toast.
+      // The userId here is the *target* profile.id of the student being
+      // promoted — sourced from `member.student_id` (which is a FK to
+      // profiles.id), so the value going into halaqah_supervisors.user_id
+      // is always a profile id, never an auth-only id.
+      await api.supervisors.assign(userId, id);
+      toast.success(t('admin.supervisorAssigned'));
+      await fetchSupervisors();
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : t('admin.supervisorAssignFailed');
+      console.error('handleAssign failed', err);
+      toast.error(message);
+    } finally {
+      setSupervisorActionId(null);
+    }
+  };
+
+  const handleRemove = async (userId: string) => {
+    if (!id) return;
+    if (!userId) {
+      console.error('handleRemove called without userId');
+      toast.error(t('admin.supervisorRemoveFailed'));
+      return;
+    }
+    setSupervisorActionId(userId);
+    const { error } = await api.supervisors.remove(userId, id);
+    setSupervisorActionId(null);
+    if (error) {
+      toast.error(t('admin.supervisorRemoveFailed'));
+      return;
+    }
+    toast.success(t('admin.supervisorRemoved'));
+    await fetchSupervisors();
+  };
 
   // Fetch student progress data
   useEffect(() => {
@@ -135,7 +230,7 @@ export function HalaqahDetails() {
     >
       <div className="space-y-8">
         {/* Admin Actions */}
-        {isAdmin() && (
+        {canManage && (
           <div className="flex flex-wrap gap-3">
             <Button onClick={() => setShowEditForm(true)} variant="outline">
               {t('admin.editHalaqah')}
@@ -224,10 +319,111 @@ export function HalaqahDetails() {
             segment={halaqah?.segment}
           />
         </PageSection>
+
+        {/* Halaqah supervisors — read-only list, visible to everyone with
+            access to the halaqah details. */}
+        <PageSection
+          title={`${t('admin.halaqahSupervisorsList')} (${supervisors.length})`}
+        >
+          <Card padding="md">
+            {loadingSupervisors ? (
+              <p className="text-sm text-muted">{t('common.loading')}</p>
+            ) : supervisors.length === 0 ? (
+              <p className="text-sm text-muted">
+                {t('admin.noSupervisorsAssigned')}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {supervisors.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between py-3"
+                  >
+                    <div>
+                      <p className="text-base text-foreground">
+                        {s.user
+                          ? getDisplayName(s.user)
+                          : s.user_id}
+                      </p>
+                      {s.user?.email && (
+                        <p className="text-sm text-muted">{s.user.email}</p>
+                      )}
+                    </div>
+                    {canManageSupervisorList && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleRemove(s.user_id)}
+                        loading={supervisorActionId === s.user_id}
+                      >
+                        {t('admin.removeSupervisor')}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </PageSection>
+
+        {/* Manage supervisors — admin/supervisor_manager only. Each row
+            is a member of THIS halaqah, with a single toggle button. */}
+        {canManageSupervisorList && (
+          <PageSection title={t('admin.manageSupervisors')}>
+            <Card padding="md">
+              {students.length === 0 ? (
+                <p className="text-sm text-muted">
+                  {t(uiText.getEmptyStateText('student', halaqah?.segment))}
+                </p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {students.map((student) => {
+                    const isSupervisor = supervisorIds.has(student.id);
+                    const isMember = memberIds.has(student.id);
+                    return (
+                      <li
+                        key={student.id}
+                        className="flex items-center justify-between py-3"
+                      >
+                        <span className="text-base text-foreground">
+                          {getDisplayName(student)}
+                        </span>
+                        {isSupervisor ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleRemove(student.id)}
+                            loading={supervisorActionId === student.id}
+                          >
+                            {t('admin.removeSupervisor')}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => handleAssign(student.id)}
+                            loading={supervisorActionId === student.id}
+                            disabled={!isMember}
+                            title={
+                              !isMember
+                                ? t('admin.studentNotInHalaqah')
+                                : undefined
+                            }
+                          >
+                            {t('admin.assignAsSupervisor')}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          </PageSection>
+        )}
       </div>
 
       {/* Edit Halaqah Modal */}
-      {isAdmin() && (
+      {canManage && (
         <>
           <HalaqahForm
             halaqah={halaqah}

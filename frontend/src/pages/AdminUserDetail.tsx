@@ -18,7 +18,7 @@ import { ProgressBar } from '../components/atoms/ProgressBar';
 import { api } from '../lib/supabase';
 import { useTranslation } from '../locales/i18n';
 import { ROUTES } from '../lib/routes';
-import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE } from '../lib/constants';
+import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE, recitationLabelKeyFor } from '../lib/constants';
 import { findCountryByIso } from '../lib/countries';
 import { getDisplayName } from '../lib/utils';
 import { segmentationRules } from '../lib/segmentationRules';
@@ -328,7 +328,11 @@ export function AdminUserDetail() {
                     />
                     <InfoRow
                       label={t('recitation.currentRecitation')}
-                      value={profile.recitation || '-'}
+                      value={(() => {
+                        // Canonical id → localized label; free-text → raw.
+                        const k = recitationLabelKeyFor(profile.recitation);
+                        return k ? t(k) : profile.recitation || '-';
+                      })()}
                     />
                   </>
                 ) : (
@@ -411,11 +415,14 @@ export function AdminUserDetail() {
                     {recitations.length === 0 ? (
                       <span className={styles.rowValue}>-</span>
                     ) : (
-                      recitations.map((r) => (
-                        <Badge key={r} variant="secondary">
-                          {r}
-                        </Badge>
-                      ))
+                      recitations.map((r) => {
+                        const k = recitationLabelKeyFor(r);
+                        return (
+                          <Badge key={r} variant="secondary">
+                            {k ? t(k) : r}
+                          </Badge>
+                        );
+                      })
                     )}
                   </div>
                 </div>

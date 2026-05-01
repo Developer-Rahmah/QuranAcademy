@@ -9,6 +9,7 @@ export { StudentRegistration } from './StudentRegistration';
 export { TeacherRegistration } from './TeacherRegistration';
 export { StudentDashboard } from './StudentDashboard';
 export { TeacherDashboard } from './TeacherDashboard';
+export { SupervisorDashboard } from './SupervisorDashboard';
 export { AdminDashboard } from './AdminDashboard';
 export { AdminUsers } from './AdminUsers';
 export { AdminUserDetail } from './AdminUserDetail';

@@ -90,18 +90,22 @@ export function getAllowedStudentTypes(segment: Segment | null | undefined): Stu
 /**
  * Which `preferred_audience` values a halaqah/teacher may pick.
  *
- *   men   → men, children, both
- *   women → women, children, both
- *   else  → full set (admin tooling / neutral surfaces)
+ * Per spec — gendered halaqahs do NOT expose 'both' (which would imply
+ * cross-gender teaching):
+ *   men   → men, children
+ *   women → women, children
+ *   else  → full set (admin tooling / neutral surfaces only)
  *
- * Notably: men NEVER see 'women' and vice versa.
+ * Notably: men NEVER see 'women' and vice versa, and men/women NEVER
+ * see 'both'. Invalid options are simply absent from the array — the
+ * UI must not render a hidden/disabled option, it must omit it.
  */
 export function getAllowedAudience(segment: Segment | null | undefined): HalaqahAudience[] {
   if (segment === UserSegment.MEN) {
-    return [AudienceType.MEN, AudienceType.CHILDREN, AudienceType.BOTH];
+    return [AudienceType.MEN, AudienceType.CHILDREN];
   }
   if (segment === UserSegment.WOMEN) {
-    return [AudienceType.WOMEN, AudienceType.CHILDREN, AudienceType.BOTH];
+    return [AudienceType.WOMEN, AudienceType.CHILDREN];
   }
   return [AudienceType.MEN, AudienceType.WOMEN, AudienceType.CHILDREN, AudienceType.BOTH];
 }
@@ -115,6 +119,8 @@ export function getAllowedAudience(segment: Segment | null | undefined): Halaqah
  */
 export function getRoleLabel(role: UserRole, segment?: Segment | string | null): string {
   if (role === 'admin') return 'auth.admin';
+  if (role === 'halaqah_supervisor') return 'auth.halaqahSupervisor';
+  if (role === 'supervisor_manager') return 'auth.supervisorManager';
   const seg = asSegment(segment);
   if (role === 'teacher') {
     if (seg === UserSegment.MEN) return 'auth.teacherMale';
