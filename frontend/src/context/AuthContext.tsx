@@ -80,6 +80,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isRecoverySessionRef.current = isRecoverySession;
   }, [isRecoverySession]);
 
+  // Tracks a userId currently being hydrated by `signIn`. The
+  // onAuthStateChange listener fires SIGNED_IN concurrently with
+  // signIn's own profile fetch — without this guard, both run a
+  // SELECT on `profiles` in parallel, and if either resolves with
+  // a null row (transient RLS race in prod) the listener's
+  // handleSessionChange used to force-signOut and wipe storage,
+  // killing the freshly-issued session. The listener now skips
+  // hydration when this ref matches its userId.
+  const signInHydratingRef = useRef<string | null>(null);
+
   // ============================================
   // Fetch Profile — delegates to api.profiles.getById, which owns the
   // trigger-delay retry loop and RLS-recursion short-circuit.
@@ -125,6 +135,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(sessionUser as unknown as User);
       setLoading(false);
 
+      // Skip the duplicate fetch if signIn is already hydrating this
+      // exact user. Without this guard, the SIGNED_IN listener and
+      // signIn() race on `profiles.select(...)`; whichever resolves
+      // first as null was previously force-signing-out the user and
+      // wiping localStorage, which was killing the freshly-issued
+      // session in production immediately after a successful login.
+      if (signInHydratingRef.current === sessionUser.id) {
+        logger.info(
+          "Skipping listener profile fetch — signIn already hydrating",
+          { userId: sessionUser.id },
+        );
+        return;
+      }
+
       setProfileLoading(true);
       const userProfile = await fetchProfile(sessionUser.id);
       if (userProfile) {
@@ -133,30 +157,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      // Session is valid but no profile row exists for this user. That's
-      // an unrecoverable state for the app (RLS blocked, deleted profile,
-      // schema drift). Force a clean logout so the next paint shows the
-      // login screen rather than a half-authenticated shell.
+      // No profile row. Do NOT force a signOut here: that competes with
+      // the explicit signIn flow and produces a "logged in then bounced
+      // back to login" symptom. Leave `profile` null — the route guards
+      // (`AuthGuard` / `RoleGuard`) will redirect to /login on their own,
+      // and the user keeps a session they can debug from.
       logger.error(
-        "Session present but profile missing — forcing signOut",
+        "Session present but profile missing — leaving profile null",
         { userId: sessionUser.id },
       );
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        logger.error("Force signOut after missing profile failed", err);
-      }
-      setUser(null);
-      setProfile(null);
       setProfileLoading(false);
-      try {
-        if (typeof window !== "undefined") {
-          window.localStorage.clear();
-          window.sessionStorage.clear();
-        }
-      } catch {
-        /* storage clear is best-effort */
-      }
     },
     [fetchProfile],
   );
@@ -318,14 +328,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Set the session immediately so guards see `user` without waiting.
         setUser(data.user as unknown as User);
 
-        // Then resolve the profile inline. Awaiting here means the caller
-        // (Login.tsx) can safely navigate once `signIn` returns — by then
-        // both `user` and `profile` are populated in context, so
-        // DashboardDispatcher renders the target page on its first paint
-        // instead of showing a spinner that requires a refresh to break.
-        const userProfile = await fetchProfile(data.user.id);
-        if (userProfile) {
-          setProfile(userProfile);
+        // Mark this user as "currently being hydrated by signIn" so the
+        // onAuthStateChange listener (which also fires SIGNED_IN for the
+        // very same login) doesn't run a parallel profile fetch.
+        signInHydratingRef.current = data.user.id;
+        try {
+          // Then resolve the profile inline. Awaiting here means the caller
+          // (Login.tsx) can safely navigate once `signIn` returns — by then
+          // both `user` and `profile` are populated in context, so
+          // DashboardDispatcher renders the target page on its first paint
+          // instead of showing a spinner that requires a refresh to break.
+          const userProfile = await fetchProfile(data.user.id);
+          if (userProfile) {
+            setProfile(userProfile);
+          }
+        } finally {
+          signInHydratingRef.current = null;
         }
 
         return { data, error: null };

@@ -43,6 +43,31 @@ async function wait(ms: number): Promise<void> {
 }
 
 /**
+ * Wraps a promise in a hard timeout. Production has shown a class of
+ * silent stalls where the supabase-js fetch never settles (browser
+ * keep-alive, CDN edge oddities, RLS recursion). Without this wrapper
+ * the dashboard spinner runs forever; with it, the caller gets a
+ * timeout error after `ms` and can fall back / retry.
+ */
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    p.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
  * Fetch a profile row by id.
  *
  * Retries only for the "row not yet created" case — after signup there's a
@@ -60,11 +85,27 @@ async function getById(
   const attempts = Math.max(1, retries);
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    let data: Profile | null = null;
+    let error: PostgrestError | Error | null = null;
+    try {
+      // PostgrestBuilder is thenable but not a strict Promise; wrap so
+      // `withTimeout` (Promise<T>) accepts it.
+      const queryPromise: Promise<{
+        data: unknown;
+        error: PostgrestError | null;
+      }> = Promise.resolve(
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      );
+      const res = await withTimeout(
+        queryPromise,
+        7000,
+        `profiles.getById(${userId})`,
+      );
+      data = (res.data as unknown as Profile) ?? null;
+      error = res.error;
+    } catch (err) {
+      error = err as Error;
+    }
 
     if (error) {
       // Fatal: RLS recursion won't resolve by retrying.
