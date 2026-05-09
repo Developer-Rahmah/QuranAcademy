@@ -24,6 +24,7 @@ import { I18nProvider, useTranslation } from "./locales/i18n";
 import { ROUTES, dashboardPathForRole } from "./lib/routes";
 import { api } from "./lib/supabase";
 import { isUserSupervisor } from "./lib/permissions";
+import { Canonical } from "./components/atoms/Canonical";
 import {
   Landing,
   Login,
@@ -559,6 +560,12 @@ function DirectionShell({ children }: { children: ReactNode }) {
 function App() {
   return (
     <BrowserRouter>
+      {/* Canonical sits at the top of the router subtree (inside
+          BrowserRouter so useLocation works, but outside the providers
+          so route-aware SEO updates are not coupled to auth/settings
+          hydration). It renders nothing — pure side-effect on
+          document.head. */}
+      <Canonical />
       <I18nProvider defaultLanguage="ar">
         <ToastProvider>
           <AuthProvider>

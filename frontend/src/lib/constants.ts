@@ -1,5 +1,16 @@
 import type { TimeSlot, Surah, UserRole, StudentType, MemorizationLevel, PreferredAudience, AccountStatus, HalaqahStatus, ReportType, UserSegment } from '../types';
 
+// ---------------------------------------------------------------------
+// Production site URL — used by the <Canonical /> atom to build the
+// `rel="canonical"` href for every route. Override per-deploy via the
+// `VITE_SITE_URL` env var (e.g. for staging) without touching code.
+// No trailing slash here — the canonical builder appends the path.
+// ---------------------------------------------------------------------
+export const SITE_URL = (
+  (import.meta.env.VITE_SITE_URL as string | undefined) ??
+  'https://www.wahdaynakacademy.com'
+).replace(/\/+$/, '');
+
 // Total pages in the Quran (Mushaf al-Madinah)
 export const TOTAL_QURAN_PAGES = 604;
 
