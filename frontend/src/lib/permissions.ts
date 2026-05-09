@@ -57,18 +57,34 @@ export function canManageUserStatus(role: RoleInput): boolean {
 /**
  * Activate / deactivate STUDENT accounts that the viewer manages.
  *
- * Returns true if the role is granted scoped activation rights:
+ * Returns true if the viewer is granted scoped activation rights:
  *   admin / supervisor_manager → ANY student (no scope).
  *   teacher                    → students in their halaqahs.
  *   halaqah_supervisor         → students in halaqahs they supervise.
  *
- * Used to gate the activation toggle in the UI. The actual scope check
- * lives server-side in the `set_student_status` RPC (migration 0012),
- * which enforces the halaqah-level rules independently of this helper.
- * That double-check is deliberate — frontend hides the button, backend
- * refuses the mutation, so a tampered client can't widen access.
+ * IMPORTANT — RELATIONAL SUPERVISOR HANDLING. Halaqah supervision is
+ * driven by rows in `halaqah_supervisors`, NOT by `profiles.role`. The
+ * vast majority of supervisors in production carry `profile.role =
+ * 'student'` plus a row in `halaqah_supervisors` (dual-role pattern).
+ * Looking only at `role` would hide the activation buttons from those
+ * users on SupervisorDashboard / HalaqahDetails.
+ *
+ * The optional `opts.isSupervisor` lets the caller signal that the
+ * viewer is a relational supervisor regardless of `profile.role`. Pass
+ * it whenever you have evidence the user is a supervisor (presence of
+ * an assignment row, being on a supervisor-only surface, etc).
+ *
+ * The actual per-student scope check lives server-side in the
+ * `set_student_status` RPC (migration 0012), which enforces the
+ * halaqah-level rules independently of this helper. That double-check
+ * is deliberate — frontend hides the button, backend refuses the
+ * mutation, so a tampered client can't widen access.
  */
-export function canManageStudentActivation(role: RoleInput): boolean {
+export function canManageStudentActivation(
+  role: RoleInput,
+  opts: { isSupervisor?: boolean } = {},
+): boolean {
+  if (opts.isSupervisor) return true;
   return (
     role === 'admin' ||
     role === 'supervisor_manager' ||
