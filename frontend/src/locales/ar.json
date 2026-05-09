@@ -78,7 +78,8 @@
     "supervisorRoleQuestion": "لديك صلاحية إشراف على حلقة. كيف تريد الدخول الآن؟",
     "noHalaqahsToSupervise": "لا يوجد لديك حلقات للإشراف حالياً",
     "backToStudent": "العودة كطالب/ة",
-    "supervisorDataLoadFailed": "لم يتم تحميل بيانات الإشراف"
+    "supervisorDataLoadFailed": "لم يتم تحميل بيانات الإشراف",
+    "accountInactive": "تم إيقاف حسابك. يرجى التواصل مع الإدارة."
   },
 
   "validation": {

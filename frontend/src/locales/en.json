@@ -78,7 +78,8 @@
     "supervisorRoleQuestion": "You're a halaqah supervisor. How would you like to continue?",
     "noHalaqahsToSupervise": "You have no halaqahs to supervise right now",
     "backToStudent": "Back as student",
-    "supervisorDataLoadFailed": "Could not load supervisor data"
+    "supervisorDataLoadFailed": "Could not load supervisor data",
+    "accountInactive": "Your account has been deactivated. Please contact administration."
   },
 
   "validation": {

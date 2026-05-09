@@ -243,7 +243,7 @@ function buildStudentRow(
 
 export function SupervisorDashboard() {
   const { t } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const toast = useToast();
 
   const [panels, setPanels] = useState<HalaqahPanel[]>([]);
@@ -268,7 +268,11 @@ export function SupervisorDashboard() {
   const canActivate = canManageStudentActivation(profile?.role, {
     isSupervisor: true,
   });
-  const canSeeContact = canContactStudents(profile?.role);
+  // Same dual-role rationale as canActivate above — relational
+  // supervisors carry profile.role='student'.
+  const canSeeContact = canContactStudents(profile?.role, {
+    isSupervisor: true,
+  });
 
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => {
@@ -305,6 +309,13 @@ export function SupervisorDashboard() {
           ? t('admin.studentActivated')
           : t('admin.studentSuspended'),
       );
+      // Self-suspend: refresh own profile so AuthProvider's active-status
+      // guard fires immediately. Without this the suspending user keeps
+      // their stale 'active' profile until the next visibility change /
+      // navigation event.
+      if (row.id === profile?.id && next !== 'active') {
+        await refreshProfile();
+      }
     } finally {
       setActivationLoadingId(null);
     }

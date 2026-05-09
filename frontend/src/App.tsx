@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { ToastProvider, useToast } from "./context/ToastContext";
+import { ToastProvider } from "./context/ToastContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { DashboardViewProvider } from "./context/DashboardViewContext";
 import { I18nProvider, useTranslation } from "./locales/i18n";
@@ -94,7 +94,9 @@ function AuthGuard({ children }: AuthGuardProps) {
 // ============================================
 // RoleGuard — role + status gate
 // Waits for the profile to hydrate (profileLoading), then:
-//   - if status !== 'active' → sign out + redirect to login (account pending/suspended).
+//   - if status !== 'active' → bounce to /login. The actual sign-out
+//     happens centrally in AuthProvider (auth/active-status guard) so
+//     a single toast fires regardless of which guard saw it first.
 //   - if role not in `allow` → send the user to their own dashboard.
 // Otherwise renders children.
 // ============================================
@@ -104,21 +106,12 @@ interface RoleGuardProps {
 }
 
 function RoleGuard({ allow, children }: RoleGuardProps) {
-  const { user, profile, profileLoading, signOut } = useAuth();
-  const toast = useToast();
+  const { user, profile, profileLoading } = useAuth();
 
   // Profile is hydrated asynchronously. Spin only while a fetch is actually
   // in flight — if it finished with null (trigger race / RLS), fall through
   // to the redirect so we don't hang forever.
   const waitingForProfile = !!user && !profile && profileLoading;
-
-  // If profile loaded but account isn't active, sign out cleanly.
-  useEffect(() => {
-    if (profile && profile.status !== "active") {
-      toast.warning("حسابك غير مفعل. يرجى انتظار موافقة الإدارة.");
-      void signOut();
-    }
-  }, [profile, signOut, toast]);
 
   if (waitingForProfile) return <LoadingSpinner />;
 
@@ -126,6 +119,9 @@ function RoleGuard({ allow, children }: RoleGuardProps) {
   if (!profile) return <Navigate to={ROUTES.login} replace />;
 
   if (profile.status !== "active") {
+    // AuthProvider's active-status effect handles signOut + toast. Here
+    // we just bail the render so a non-active profile never shows
+    // protected UI even for the millisecond before signOut completes.
     return <Navigate to={ROUTES.login} replace />;
   }
 
