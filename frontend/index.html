@@ -4,20 +4,73 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0F4C3A" />
+
+    <!--
+      ====================================================================
+      SEO defaults
+      ====================================================================
+      The <Seo /> React component (mounted inside BrowserRouter +
+      I18nProvider + SettingsProvider) takes ownership of these tags at
+      runtime and rewrites their values on every route / language
+      change. The static fallbacks below exist so:
+
+        - the initial HTML response carries valid SEO before any JS runs;
+        - JS-less crawlers (some social-share scrapers, search appliances
+          that don't execute JS) still see correct titles/descriptions
+          and a working canonical pointing at the homepage.
+
+      Per-route titles / descriptions / OG / Twitter values are sourced
+      from `src/lib/seo.ts` + `src/locales/*.json` and applied on mount.
+    -->
+    <title>أكاديمية وهديناك — تعليم وتحفيظ القرآن الكريم أونلاين | Wahdaynak Academy</title>
     <meta
       name="description"
-      content="أكاديمية وهديناك لخدمات القرآن الكريم وعلومه — رحلة لتدبر آيات الله"
+      content="أكاديمية وهديناك لخدمات القرآن الكريم وعلومه: حلقات تحفيظ، تجويد، إجازات، ودورات قرآنية أونلاين بإشراف معلمين متخصصين."
     />
-    <!--
-      Default canonical — points to the homepage on the production
-      domain. The <Canonical /> React component (mounted inside
-      BrowserRouter) takes ownership at runtime and rewrites this
-      tag's `href` on every route change, so deeper pages still get
-      their correct canonical. This static fallback exists so the
-      initial server response and JS-less crawlers see a valid one.
-    -->
+    <meta
+      name="keywords"
+      content="أكاديمية قرآن, تحفيظ القرآن الكريم, تعليم القرآن, تجويد, إجازة, Quran academy, online Quran learning, memorize Quran, tajweed"
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="Wahdaynak Academy" />
+
     <link rel="canonical" href="https://www.wahdaynakacademy.com/" />
-    <title>أكاديمية وهديناك — Wahdaynak Academy</title>
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Wahdaynak Academy" />
+    <meta property="og:locale" content="ar_SA" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:url" content="https://www.wahdaynakacademy.com/" />
+    <meta
+      property="og:title"
+      content="أكاديمية وهديناك — تعليم وتحفيظ القرآن الكريم أونلاين"
+    />
+    <meta
+      property="og:description"
+      content="حلقات منظمة، إجازات، ومتابعة فردية لكل طالب وطالبة في أكاديمية وهديناك للقرآن الكريم وعلومه."
+    />
+    <meta
+      property="og:image"
+      content="https://www.wahdaynakacademy.com/wahdaynakacademylogo.png"
+    />
+    <meta property="og:image:alt" content="شعار أكاديمية وهديناك" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="أكاديمية وهديناك — تعليم وتحفيظ القرآن الكريم أونلاين"
+    />
+    <meta
+      name="twitter:description"
+      content="حلقات منظمة، إجازات، ومتابعة فردية لكل طالب وطالبة في أكاديمية وهديناك."
+    />
+    <meta
+      name="twitter:image"
+      content="https://www.wahdaynakacademy.com/wahdaynakacademylogo.png"
+    />
   </head>
   <body class="bg-background">
     <div id="root"></div>

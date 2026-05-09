@@ -10,7 +10,8 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(/Users/rahmah/Documents/QuranAcademy/frontend/node_modules/.bin/vite build *)",
       "Bash(/Users/rahmah/Documents/QuranAcademy/frontend/node_modules/.bin/tsc --noEmit)",
-      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -n \"DashboardLayout\\\\|AuthLayout\\\\|<Header\\\\|<main\\\\|return \\(\" \"{}\" | head -8')"
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -n \"DashboardLayout\\\\|AuthLayout\\\\|<Header\\\\|<main\\\\|return \\(\" \"{}\" | head -8')",
+      "Bash(node scripts/generate-sitemap.mjs)"
     ]
   }
 }
