@@ -19,6 +19,7 @@ import { api } from '../lib/supabase';
 import { useTranslation } from '../locales/i18n';
 import { ROUTES } from '../lib/routes';
 import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE, recitationLabelKeyFor } from '../lib/constants';
+import { formatSlotRange } from '../lib/time';
 import { findCountryByIso } from '../lib/countries';
 import { getDisplayName } from '../lib/utils';
 import { segmentationRules } from '../lib/segmentationRules';
@@ -95,19 +96,26 @@ function countryDisplay(raw: string | null | undefined): string {
 }
 
 /**
- * Render a profile's `available_times` list as human-friendly 24h labels,
- * always annotated with the academy's Mecca timezone.
+ * Render a profile's `available_times` list as human-friendly 12h
+ * Arabic / English labels, always annotated with the academy's Mecca
+ * timezone.
  *
- * Slot ids follow the `HH-HH` pattern produced by `TIME_SLOTS` (e.g. "09-10").
- * The backend can also hand back an object-shaped schedule keyed by day; we
- * just flatten it into one list of labels for display.
+ * Slot ids follow the `HH-HH` pattern produced by `TIME_SLOTS`. Both
+ * the new 2-hour grid (e.g. "08-10") and any legacy 1-hour rows
+ * (e.g. "09-10") are accepted — `formatSlotRange` parses any width
+ * and falls through to the raw id only for unparseable input.
+ *
+ * The backend can also hand back an object-shaped schedule keyed by
+ * day; we just flatten it into one list of slot ids for display.
  */
 function AvailableTimesList({
   profile,
   t,
+  language,
 }: {
   profile: { available_times?: unknown };
   t: (k: string) => string;
+  language: 'ar' | 'en';
 }) {
   const raw = profile.available_times;
   const slots: string[] = Array.isArray(raw)
@@ -122,21 +130,12 @@ function AvailableTimesList({
     return <p className={styles.empty}>{t('userDetail.noAvailableTimes')}</p>;
   }
 
-  const formatSlot = (id: string): string => {
-    // Expected form: "HH-HH". Anything else renders verbatim.
-    const m = id.match(/^(\d{1,2})-(\d{1,2})$/);
-    if (!m) return id;
-    const start = m[1].padStart(2, '0');
-    const end = m[2].padStart(2, '0');
-    return `${start}:00 - ${end}:00`;
-  };
-
   return (
     <div>
       <ul className={styles.chipRow}>
         {slots.map((s) => (
           <Badge key={s} variant="secondary">
-            {formatSlot(s)}
+            {formatSlotRange(s, language)}
           </Badge>
         ))}
       </ul>
@@ -150,7 +149,7 @@ function AvailableTimesList({
 // ============================================
 export function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -304,7 +303,7 @@ export function AdminUserDetail() {
       <PageSection title={t('userDetail.availableTimes')}>
         <Card>
           <CardContent className="p-6">
-            <AvailableTimesList profile={profile} t={t} />
+            <AvailableTimesList profile={profile} t={t} language={language} />
           </CardContent>
         </Card>
       </PageSection>

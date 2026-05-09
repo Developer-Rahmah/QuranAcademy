@@ -1,4 +1,9 @@
 import type { TimeSlot, Surah, UserRole, StudentType, MemorizationLevel, PreferredAudience, AccountStatus, HalaqahStatus, ReportType, UserSegment } from '../types';
+import { SESSION_DURATION_HOURS, makeSlotId } from './time';
+
+// Re-exported so callers that already pull scheduling primitives from
+// `lib/constants` keep working without a sweep through every consumer.
+export { SESSION_DURATION_HOURS } from './time';
 
 // ---------------------------------------------------------------------
 // Production site URL — used by the <Canonical /> atom to build the
@@ -133,15 +138,27 @@ export const CONTACT_INFO = {
 export const ACADEMY_TIMEZONE = 'Asia/Riyadh';
 
 /**
- * Full 24/7 availability grid. Each slot is a one-hour block labelled in
- * 24-hour notation so it's language-neutral; Arabic/English copy formats
- * these ids via locale helpers at render time.
+ * Round-the-clock availability grid, generated from `SESSION_DURATION_HOURS`.
+ *
+ * Each slot is a `SESSION_DURATION_HOURS`-long block (currently 2h) so
+ * the picker matches the real halaqah session length. Ids stay in the
+ * canonical `HH-HH` 24h shape for language-neutral storage; the visible
+ * 12h Arabic/English label is computed at render time via
+ * `formatSlotRange(id, language)` from `lib/time.ts`.
+ *
+ * Storage compatibility: profiles created before the move from 1-hour
+ * to 2-hour slots may still hold ids like "09-10". Display code uses
+ * `formatSlotRange` directly on those ids, so they keep rendering
+ * correctly. The selector emits only the new 2-hour ids going forward,
+ * so the data self-heals as users re-save their availability.
  */
-export const TIME_SLOTS: TimeSlot[] = Array.from({ length: 24 }, (_, h) => {
-  const start = String(h).padStart(2, '0');
-  const end = String((h + 1) % 24).padStart(2, '0');
-  return { id: `${start}-${end}`, label: `${start}:00 - ${end}:00` };
-});
+export const TIME_SLOTS: TimeSlot[] = Array.from(
+  { length: Math.floor(24 / SESSION_DURATION_HOURS) },
+  (_, i) => {
+    const startHour = i * SESSION_DURATION_HOURS;
+    return { id: makeSlotId(startHour), startHour };
+  },
+);
 
 // List of all Surahs in the Quran
 export const SURAHS: Surah[] = [
