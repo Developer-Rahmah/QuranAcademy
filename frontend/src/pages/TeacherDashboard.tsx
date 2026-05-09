@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { useHalaqahs, useHalaqah } from "../hooks/useHalaqah";
-import { db } from "../lib/supabase";
+import { api, db } from "../lib/supabase";
 import {
   DashboardLayout,
   PageSection,
@@ -11,7 +12,11 @@ import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
 import { StudentTable } from "../components/organisms/StudentTable";
 import { uiText } from "../lib/uiText";
 import { useTranslation } from "../locales/i18n";
-import type { StudentWithProgress } from "../types";
+import {
+  canManageStudentActivation,
+  canContactStudents,
+} from "../lib/permissions";
+import type { AccountStatus, StudentWithProgress } from "../types";
 
 /**
  * Teacher Dashboard Page
@@ -19,6 +24,7 @@ import type { StudentWithProgress } from "../types";
 export function TeacherDashboard() {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const toast = useToast();
   const { halaqahs, loading: loadingHalaqahs } = useHalaqahs({
     teacherId: profile?.id,
   });
@@ -30,10 +36,39 @@ export function TeacherDashboard() {
     halaqah,
     members,
     loading: loadingHalaqah,
+    refetch,
   } = useHalaqah(teacherHalaqah?.id);
 
   const [students, setStudents] = useState<StudentWithProgress[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
+  const [activationLoadingId, setActivationLoadingId] = useState<string | null>(null);
+
+  const canActivate = canManageStudentActivation(profile?.role);
+  const canSeeContact = canContactStudents(profile?.role);
+
+  // Toggle a student's activation status. Backend RPC enforces scope
+  // (the teacher must own a halaqah this student belongs to), so this
+  // handler just dispatches and surfaces the result.
+  const handleToggleActivation = async (student: StudentWithProgress) => {
+    const next: AccountStatus =
+      student.status === "active" ? "suspended" : "active";
+    setActivationLoadingId(student.id);
+    try {
+      const { error } = await api.profiles.setStudentStatus(student.id, next);
+      if (error) {
+        toast.error(error.message || t("errors.unauthorized"));
+        return;
+      }
+      toast.success(
+        next === "active"
+          ? t("admin.studentActivated")
+          : t("admin.studentSuspended"),
+      );
+      refetch?.();
+    } finally {
+      setActivationLoadingId(null);
+    }
+  };
 
   // Fetch student progress data
   useEffect(() => {
@@ -56,6 +91,10 @@ export function TeacherDashboard() {
             return {
               id: member.student_id,
               ...member.student,
+              // Status comes from the joined select on
+              // halaqah_members.byHalaqah; surfaced here so
+              // StudentTable can render the activation toggle's label.
+              status: member.student?.status,
               memorizationPages: progressData?.memorization || 0,
               reviewPages: progressData?.review || 0,
               progress: progressData?.progress || 0,
@@ -74,9 +113,9 @@ export function TeacherDashboard() {
     fetchStudentProgress();
   }, [members]);
 
-  const handleViewReports = (student: StudentWithProgress) => {
-    // Could navigate to a reports page or show a modal
-    console.log("View reports for:", student);
+  const handleViewReports = (_student: StudentWithProgress) => {
+    // Reports drill-in not implemented yet — kept as a stable callback
+    // so StudentTable's onViewReports prop has a typed handler.
   };
 
   const isLoading = loadingHalaqahs || loadingHalaqah;
@@ -143,6 +182,10 @@ export function TeacherDashboard() {
               loading={loadingStudents}
               onViewReports={handleViewReports}
               segment={halaqah?.segment}
+              showContact={canSeeContact}
+              showActivation={canActivate}
+              activationLoadingId={activationLoadingId}
+              onToggleActivation={handleToggleActivation}
             />
           </PageSection>
         </div>

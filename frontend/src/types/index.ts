@@ -112,7 +112,17 @@ export interface HalaqahMember {
   id: string;
   halaqah_id: string;
   student_id: string;
-  student?: Pick<Profile, 'id' | 'first_name' | 'second_name' | 'phone' | 'email'>;
+  // Joined profile fields. `status` and `third_name` were added for the
+  // activation toggle + supervisor contact column respectively. They're
+  // optional because older joins (e.g. `forStudent`) may not project
+  // them; consumers fall back gracefully when undefined.
+  student?: Pick<
+    Profile,
+    'id' | 'first_name' | 'second_name' | 'phone' | 'email'
+  > & {
+    third_name?: string;
+    status?: AccountStatus;
+  };
   halaqah?: Halaqah;
   joined_at: string;
   status: AccountStatus;
@@ -145,9 +155,17 @@ export interface ReportItem {
 // TeacherDashboard and any other surface that renders student progress.
 // Progress fields are optional because some call sites populate them lazily
 // and all consumers already fall back to 0 when rendering.
-export interface StudentWithProgress extends Pick<Profile, 'id' | 'first_name' | 'second_name'> {
+export interface StudentWithProgress
+  extends Pick<Profile, 'id' | 'first_name' | 'second_name'> {
+  // Optional third name — surfaced for the supervisor contact view
+  // which shows the full three-part name.
+  third_name?: string;
   phone?: string;
   email?: string;
+  // Account status, surfaced so dashboards can render the activation
+  // toggle without a second fetch. Optional because not every consumer
+  // populates it.
+  status?: AccountStatus;
   memorizationPages?: number;
   reviewPages?: number;
   progress?: number;

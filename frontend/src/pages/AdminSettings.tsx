@@ -34,6 +34,7 @@ const EMPTY: FormState = {
   instagram_url: '',
   whatsapp_number: '',
   email: '',
+  complaints_telegram_username: '',
 };
 
 export function AdminSettings() {
@@ -55,6 +56,7 @@ export function AdminSettings() {
       instagram_url:          raw.instagram_url ?? '',
       whatsapp_number:        raw.whatsapp_number ?? '',
       email:                  raw.email ?? '',
+      complaints_telegram_username: raw.complaints_telegram_username ?? '',
     });
   }, [raw]);
 
@@ -161,6 +163,16 @@ export function AdminSettings() {
                 placeholder="contact@example.com"
                 value={form.email}
                 onChange={(e) => setField('email', e.target.value)}
+              />
+              <FormField
+                label={t('adminSettings.complaintsTelegram')}
+                name="complaints_telegram_username"
+                type="text"
+                placeholder="@wahdaynak_support"
+                value={form.complaints_telegram_username}
+                onChange={(e) =>
+                  setField('complaints_telegram_username', e.target.value)
+                }
               />
             </CardContent>
           </Card>

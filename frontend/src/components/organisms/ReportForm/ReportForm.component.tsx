@@ -16,7 +16,12 @@ import { Input } from '../../atoms/Input';
 import { Card, CardContent } from '../../molecules/Card';
 import { PlusIcon, SaveIcon, RefreshIcon } from '../../atoms/Icon';
 import { SURAHS, REPORT_TYPES, MIN_PAGES } from '../../../lib/constants';
-import { cn, formatDateISO, validatePages, generateId } from '../../../lib/utils';
+import {
+  cn,
+  getTodayLocalDate,
+  validatePages,
+  generateId,
+} from '../../../lib/utils';
 import { getErrorMessage } from '../../../lib/errorHandler';
 import { reportFormStyles } from './ReportForm.style';
 import type { ReportItem, FormErrors, ReportFormProps } from './ReportForm.types';
@@ -33,16 +38,19 @@ export function ReportForm({ className }: ReportFormProps) {
   const { membership, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
   const { createReport, loading: submitting } = useCreateReport();
 
-  // Form state
-  // Per spec: report date is shifted +1 day from "now". This corrects a
-  // previously observed off-by-one display where the date appeared one
-  // day behind the user's local calendar day.
-  const todayPlusOne = (() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    return date;
-  })();
-  const [reportDate, setReportDate] = useState(formatDateISO(todayPlusOne));
+  // Form state.
+  //
+  // Default `reportDate` is TODAY in the user's LOCAL timezone — read
+  // via `getTodayLocalDate()`, which builds the YYYY-MM-DD string from
+  // `getFullYear / getMonth / getDate` so users in positive UTC offsets
+  // (KSA UTC+3) don't see tomorrow when filing late at night.
+  //
+  // A previous attempt fixed the off-by-one by adding +1 day to
+  // `new Date()` — that masked a UTC shift in `formatDateISO`. Once
+  // `formatDateISO` was switched to local components the +1 hack began
+  // rendering tomorrow. The hack is gone; this is the canonical source.
+  const today = getTodayLocalDate();
+  const [reportDate, setReportDate] = useState(today);
   const [memorizationItems, setMemorizationItems] = useState<ReportItem[]>([
     { id: generateId(), surah_name: '', pages: '' },
   ]);
@@ -113,7 +121,7 @@ export function ReportForm({ className }: ReportFormProps) {
         } else {
           const validation = validatePages(item.pages);
           if (!validation.isValid) {
-            newErrors[`memorization_${item.id}_pages`] = validation.message;
+            newErrors[`memorization_${item.id}_pages`] = t(validation.messageKey);
           }
         }
       }
@@ -130,7 +138,7 @@ export function ReportForm({ className }: ReportFormProps) {
         } else {
           const validation = validatePages(item.pages);
           if (!validation.isValid) {
-            newErrors[`review_${item.id}_pages`] = validation.message;
+            newErrors[`review_${item.id}_pages`] = t(validation.messageKey);
           }
         }
       }
@@ -316,7 +324,8 @@ export function ReportForm({ className }: ReportFormProps) {
             type="date"
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
-            max={formatDateISO(todayPlusOne)}
+            // Cap at TODAY (local). No future-dated reports.
+            max={today}
           />
         </CardContent>
       </Card>

@@ -145,10 +145,33 @@ async function update(userId: string, updates: Partial<Profile>): Promise<Result
   return { data: (data as unknown as Profile) ?? null, error };
 }
 
+/**
+ * Set a STUDENT's account status (active / pending / suspended) via the
+ * `set_student_status` RPC. The RPC (migration 0012) enforces scope:
+ * teachers/halaqah_supervisors may only flip students within halaqahs
+ * they manage. Admins/supervisor_managers can flip any non-org account.
+ *
+ * Use this for any teacher / supervisor activation surface. Admin user
+ * management still goes through `update()` directly (admin RLS).
+ */
+async function setStudentStatus(
+  studentId: string,
+  newStatus: AccountStatus,
+): Promise<{ error: Error | PostgrestError | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+  const { error } = await client.rpc('set_student_status', {
+    target: studentId,
+    new_status: newStatus,
+  });
+  return { error };
+}
+
 export const profilesApi = {
   getById,
   list,
   create,
   update,
+  setStudentStatus,
   NOT_FOUND_CODE,
 };

@@ -86,8 +86,6 @@ async function listByUser(userId: string): Promise<ListResult<HalaqahSupervisorR
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  console.log('FETCH SUPERVISOR ASSIGNMENTS START', userId);
-
   // Hard timeout — production saw the dashboard hang for ~30s on this
   // query when supabase-js silently stalled. We'd rather the user see
   // an empty supervisor state immediately than block the whole
@@ -112,10 +110,8 @@ async function listByUser(userId: string): Promise<ListResult<HalaqahSupervisorR
     error = err as Error;
   }
 
-  console.log('FETCH RESULT', { data, error });
-
   if (error) {
-    console.error('FETCH SUPERVISOR ASSIGNMENTS ERROR', error);
+    console.error('supervisors.listByUser error', error);
   }
 
   return { data, error };
@@ -158,8 +154,6 @@ async function assign(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  console.log('ASSIGN SUPERVISOR START', { userId, halaqahId });
-
   // Idempotent pre-check.
   const existing = await client
     .from('halaqah_supervisors')
@@ -168,7 +162,6 @@ async function assign(
     .eq('halaqah_id', halaqahId)
     .maybeSingle();
   if (existing?.data?.id) {
-    console.log('ASSIGN SUPERVISOR — already exists', existing.data);
     return { data: existing.data as HalaqahSupervisorRow, error: null };
   }
 
@@ -181,21 +174,10 @@ async function assign(
     .select()
     .single();
 
-  console.log('ASSIGN RESULT', { data, error });
-
   if (error) {
-    console.error('SUPERVISOR ASSIGN ERROR', error);
+    console.error('supervisors.assign error', error);
     throw new Error(error.message);
   }
-
-  // Verification — fetch the row(s) for this user immediately after.
-  // Useful when debugging RLS: a missing row here while `error` was
-  // null is the smoking gun for a silent policy block.
-  const { data: check } = await client
-    .from('halaqah_supervisors')
-    .select('*')
-    .eq('user_id', userId);
-  console.log('VERIFY INSERT', check);
 
   return { data: (data as HalaqahSupervisorRow) ?? null, error: null };
 }

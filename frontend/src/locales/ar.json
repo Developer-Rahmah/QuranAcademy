@@ -85,7 +85,7 @@
     "emailRequired": "البريد الإلكتروني مطلوب",
     "emailInvalid": "البريد الإلكتروني غير صحيح",
     "passwordRequired": "كلمة المرور مطلوبة",
-    "passwordMinLength": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+    "passwordMinLength": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
     "phoneRequired": "رقم الهاتف مطلوب",
     "phoneInvalid": "رقم الهاتف غير صحيح",
     "nameRequired": "الاسم مطلوب",
@@ -93,7 +93,9 @@
     "countryRequired": "الدولة مطلوبة",
     "timeSlotsRequired": "يرجى اختيار موعد واحد على الأقل",
     "agreementRequired": "يرجى الموافقة على الشروط والأحكام",
-    "fixErrors": "يرجى تصحيح الأخطاء في النموذج"
+    "fixErrors": "يرجى تصحيح الأخطاء في النموذج",
+    "pagesTooFew": "الحد الأدنى: ربع صفحة (0.25)",
+    "pagesTooMany": "الحد الأقصى: 604 صفحة"
   },
 
   "registration": {
@@ -245,7 +247,32 @@
     "name": "اسم الطالبة",
     "memorizationPages": "صفحات الحفظ",
     "reviewPages": "صفحات المراجعة",
-    "progress": "نسبة الإنجاز"
+    "progress": "نسبة الإنجاز",
+    "contact": "التواصل",
+    "noPhone": "لا يوجد رقم",
+    "activation": "التفعيل"
+  },
+
+  "feedback": {
+    "button": "الشكاوى والاقتراحات",
+    "title": "الشكاوى والاقتراحات",
+    "subtitle": "اكتب/ي شكواك أو اقتراحك وسيتم تحويلك إلى تطبيق المراسلة لإرسال الرسالة.",
+    "placeholder": "اكتب/ي رسالتك هنا...",
+    "send": "إرسال",
+    "messageRequired": "يرجى كتابة الرسالة قبل الإرسال",
+    "telegramMissing": "حساب تيليجرام للشكاوى غير مُعدّ بعد. يرجى إبلاغ الإدارة.",
+    "openedTelegram": "تم فتح تيليجرام لإرسال الرسالة",
+    "bodyHeader": "شكوى / اقتراح جديد:",
+    "fieldName": "الاسم",
+    "fieldRole": "الدور",
+    "fieldHalaqah": "الحلقة",
+    "fieldMessage": "النص",
+    "noHalaqah": "لا يوجد"
+  },
+
+  "social": {
+    "youtube": "يوتيوب",
+    "telegram": "تيليجرام"
   },
 
   "report": {
@@ -327,6 +354,7 @@
     "instagramUrl": "رابط إنستغرام",
     "whatsappNumber": "رقم واتساب",
     "emailAddress": "البريد الإلكتروني",
+    "complaintsTelegram": "حساب تيليجرام للشكاوى والاقتراحات",
     "save": "حفظ التغييرات",
     "saveSuccess": "تم حفظ الإعدادات بنجاح",
     "saveError": "تعذّر حفظ الإعدادات"
@@ -475,6 +503,8 @@
     "suspend": "إيقاف",
     "reactivate": "إعادة تفعيل",
     "userUpdated": "تم تحديث المستخدم بنجاح",
+    "studentActivated": "تم تفعيل حساب الطالب/ة",
+    "studentSuspended": "تم إيقاف حساب الطالب/ة",
     "manageSupervisors": "إدارة المشرفين",
     "halaqahSupervisorsList": "المشرفون على الحلقة",
     "noSupervisorsAssigned": "لا يوجد مشرفون معينون على هذه الحلقة",

@@ -3,6 +3,19 @@ import type { TimeSlot, Surah, UserRole, StudentType, MemorizationLevel, Preferr
 // Total pages in the Quran (Mushaf al-Madinah)
 export const TOTAL_QURAN_PAGES = 604;
 
+// ---------------------------------------------------------------------
+// Public social links — config-driven so we don't sprinkle URLs across
+// components. Read by the landing footer + any future surface that
+// wants to link out. Values are sourced from Vite env vars at build
+// time so they can be overridden per-deploy without touching code.
+// ---------------------------------------------------------------------
+export const SOCIAL_LINKS = {
+  youtube:
+    (import.meta.env.VITE_SOCIAL_YOUTUBE as string | undefined) ?? '',
+  telegram:
+    (import.meta.env.VITE_SOCIAL_TELEGRAM as string | undefined) ?? '',
+} as const;
+
 // Minimum pages for a report entry
 export const MIN_PAGES = 0.25;
 

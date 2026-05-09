@@ -16,12 +16,14 @@
  *   Manage halaqahs (CRUD)      |   ✅   |        ✅          |  no
  *   Manage halaqah students     |   ✅   |        ✅          |  no
  *   Manage halaqah supervisors  |   ✅   |        ✅          |  no
+ *   Manage user account status  |   ✅   |        ✅          |  no
  *   View admin user list        |   ✅   |        ✅          |  no
  *   Delete users                |   ✅   |        no          |  no
  *   Assign role: admin          |   ✅   |        no          |  no
  *   Assign role: supervisor_mgr |   ✅   |        no          |  no
  *   Assign role: student/teacher|   ✅   |        ✅          |  no
  *   Access academy settings     |   ✅   |        no          |  no
+ *   Contact students directly   |   ✅   |        ✅          |  teacher / halaqah_supervisor
  */
 import type { UserRole } from '../types';
 
@@ -43,6 +45,60 @@ export function canManageSupervisors(role: RoleInput): boolean {
   return role === 'admin' || role === 'supervisor_manager';
 }
 
+/**
+ * Activate / deactivate / suspend user accounts globally (admin users
+ * page). Admin + supervisor_manager only — teachers and halaqah
+ * supervisors must never reach this surface.
+ */
+export function canManageUserStatus(role: RoleInput): boolean {
+  return role === 'admin' || role === 'supervisor_manager';
+}
+
+/**
+ * Activate / deactivate STUDENT accounts that the viewer manages.
+ *
+ * Returns true if the role is granted scoped activation rights:
+ *   admin / supervisor_manager → ANY student (no scope).
+ *   teacher                    → students in their halaqahs.
+ *   halaqah_supervisor         → students in halaqahs they supervise.
+ *
+ * Used to gate the activation toggle in the UI. The actual scope check
+ * lives server-side in the `set_student_status` RPC (migration 0012),
+ * which enforces the halaqah-level rules independently of this helper.
+ * That double-check is deliberate — frontend hides the button, backend
+ * refuses the mutation, so a tampered client can't widen access.
+ */
+export function canManageStudentActivation(role: RoleInput): boolean {
+  return (
+    role === 'admin' ||
+    role === 'supervisor_manager' ||
+    role === 'teacher' ||
+    role === 'halaqah_supervisor'
+  );
+}
+
+/**
+ * Spec-named alias of `canManageStudentActivation`. Same semantics —
+ * exposed under both names so call-sites can read naturally:
+ *
+ *   if (canToggleStudentActivation(role)) { ... }
+ *
+ * The backend RPC (`set_student_status`, migration 0012) enforces the
+ * per-student scope — this client-side helper only gates UI affordance.
+ */
+export const canToggleStudentActivation = canManageStudentActivation;
+
+/**
+ * Generic "can act on a student account in a managed scope".
+ *
+ * Currently aliased to `canManageStudentActivation` because account
+ * activation is the only per-student action delegated to teachers /
+ * halaqah supervisors. If we ever add more student-scoped actions
+ * (e.g. resetting password, editing fields), they go here so call
+ * sites don't need to know which sub-rule applies.
+ */
+export const canManageStudent = canManageStudentActivation;
+
 /** Hard-delete user records. Admin only. */
 export function canDeleteUsers(role: RoleInput): boolean {
   return role === 'admin';
@@ -51,6 +107,20 @@ export function canDeleteUsers(role: RoleInput): boolean {
 /** Read or write academy-wide settings. Admin only. */
 export function canManageSettings(role: RoleInput): boolean {
   return role === 'admin';
+}
+
+/**
+ * Contact students directly (WhatsApp / phone). Granted to anyone
+ * responsible for halaqah oversight: admin, supervisor_manager,
+ * teachers, and halaqah supervisors.
+ */
+export function canContactStudents(role: RoleInput): boolean {
+  return (
+    role === 'admin' ||
+    role === 'supervisor_manager' ||
+    role === 'teacher' ||
+    role === 'halaqah_supervisor'
+  );
 }
 
 /**
@@ -101,8 +171,13 @@ export const permissions = {
   canManageHalaqah,
   canManageHalaqahStudents,
   canManageSupervisors,
+  canManageUserStatus,
+  canManageStudentActivation,
+  canToggleStudentActivation,
+  canManageStudent,
   canDeleteUsers,
   canManageSettings,
+  canContactStudents,
   canAssignRole,
   isAdminOrSupervisorManager,
   isUserSupervisor,

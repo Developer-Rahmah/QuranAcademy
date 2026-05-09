@@ -77,11 +77,16 @@ async function remove(halaqahId: string): Promise<{ error: Error | PostgrestErro
 // --------------- halaqah_members ---------------
 
 async function membersByHalaqah(halaqahId: string): Promise<ListResult<HalaqahMember>> {
+  // `status` is pulled in for the activation toggle surfaces
+  // (TeacherDashboard, HalaqahDetails) so the row knows whether the
+  // current state is active / suspended without an extra fetch.
+  // `third_name` is included so the supervisor contact column can show
+  // the full three-part name.
   const { data, error } = await supabase
     .from('halaqah_members')
     .select(`
       *,
-      student:profiles!student_id(id, first_name, second_name, phone, email)
+      student:profiles!student_id(id, first_name, second_name, third_name, phone, email, status)
     `)
     .eq('halaqah_id', halaqahId)
     .eq('status', 'active');

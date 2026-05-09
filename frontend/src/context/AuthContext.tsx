@@ -413,13 +413,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         language_type: languageType,
       };
 
-      // Unmissable diagnostic printed with the exact label the product
-      // spec asked for. This is what `options.data` will be in the
-      // supabase.auth.signUp call immediately below — if `language_type`
-      // is missing from this log, it is missing from the network request
-      // and therefore missing from `raw_user_meta_data`.
-      console.log('SIGNUP META', signupMetadata);
-      // Also keep a structured log for server-log tooling.
+      // Structured log so server-log tooling can confirm metadata
+      // shape lands as expected. (Drops the verbose raw dump.)
       logger.info("signUp metadata sent to Supabase", {
         keys: Object.keys(signupMetadata),
         language_type: signupMetadata.language_type,

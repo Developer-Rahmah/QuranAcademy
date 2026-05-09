@@ -8,7 +8,7 @@ import { Button } from '../../atoms/Button';
 import { Badge } from '../../atoms/Badge';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { DocumentIcon } from '../../atoms/Icon';
-import { getDisplayName } from '../../../lib/utils';
+import { getDisplayName, getFullName, buildWhatsAppLink } from '../../../lib/utils';
 import { uiText } from '../../../lib/uiText';
 import { studentTableStyles, studentCardStyles } from './StudentTable.style';
 import type { StudentTableProps, StudentCardProps } from './StudentTable.types';
@@ -20,6 +20,10 @@ export function StudentTable({
   students = [],
   loading = false,
   showReportsButton = true,
+  showContact = false,
+  showActivation = false,
+  onToggleActivation,
+  activationLoadingId = null,
   onViewReports,
   segment,
 }: StudentTableProps) {
@@ -54,6 +58,12 @@ export function StudentTable({
               {showReportsButton && (
                 <th className={studentTableStyles.headerCell}>{t('report.title')}</th>
               )}
+              {showActivation && (
+                <th className={studentTableStyles.headerCell}>{t('student.activation')}</th>
+              )}
+              {showContact && (
+                <th className={studentTableStyles.headerCell}>{t('student.contact')}</th>
+              )}
               <th className={studentTableStyles.headerCell}>{t('common.progress')}</th>
               <th className={studentTableStyles.headerCell}>{t('student.reviewPages')}</th>
               <th className={studentTableStyles.headerCell}>{t('student.memorizationPages')}</th>
@@ -76,6 +86,75 @@ export function StudentTable({
                       <DocumentIcon className="w-4 h-4" />
                       {t('report.title')}
                     </Button>
+                  </td>
+                )}
+                {showActivation && (
+                  <td className={studentTableStyles.bodyCell}>
+                    {(() => {
+                      // We compute the next-status label per row so the
+                      // button reads "Deactivate" for active students
+                      // and "Activate" otherwise. Suspended/pending
+                      // both flip to active on click — symmetrical
+                      // with how AdminUsers handles the toggle.
+                      const isActive = student.status === 'active';
+                      const loading = activationLoadingId === student.id;
+                      return (
+                        <Button
+                          size="sm"
+                          variant={isActive ? 'destructive' : 'success'}
+                          loading={loading}
+                          onClick={() => onToggleActivation?.(student)}
+                        >
+                          {isActive
+                            ? t('admin.suspend')
+                            : t('admin.activate')}
+                        </Button>
+                      );
+                    })()}
+                  </td>
+                )}
+                {showContact && (
+                  <td className={studentTableStyles.bodyCell}>
+                    {(() => {
+                      // Build a single contact cell containing the full
+                      // three-part name (when present), phone-as-WhatsApp
+                      // link (when present), and email-as-mailto (when
+                      // present). Each line falls through gracefully if
+                      // the column is null at the data layer.
+                      const link = buildWhatsAppLink(student.phone);
+                      const fullName =
+                        getFullName(student) || getDisplayName(student);
+                      return (
+                        <div className="flex flex-col gap-1 items-end max-w-[220px]">
+                          <span className="text-sm font-medium text-foreground truncate w-full text-end">
+                            {fullName}
+                          </span>
+                          {link ? (
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-primary hover:underline truncate w-full text-end"
+                            >
+                              {student.phone}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted">
+                              {t('student.noPhone')}
+                            </span>
+                          )}
+                          {student.email && (
+                            <a
+                              href={`mailto:${student.email}`}
+                              className="text-xs text-muted hover:text-primary truncate w-full text-end"
+                              title={student.email}
+                            >
+                              {student.email}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                 )}
                 <td className={studentTableStyles.bodyCell}>

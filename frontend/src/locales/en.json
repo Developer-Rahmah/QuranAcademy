@@ -85,7 +85,7 @@
     "emailRequired": "Email is required",
     "emailInvalid": "Invalid email address",
     "passwordRequired": "Password is required",
-    "passwordMinLength": "Password must be at least 6 characters",
+    "passwordMinLength": "Password must be at least 8 characters",
     "phoneRequired": "Phone number is required",
     "phoneInvalid": "Invalid phone number",
     "nameRequired": "Name is required",
@@ -93,7 +93,9 @@
     "countryRequired": "Country is required",
     "timeSlotsRequired": "Please select at least one time slot",
     "agreementRequired": "Please agree to terms and conditions",
-    "fixErrors": "Please fix the errors in the form"
+    "fixErrors": "Please fix the errors in the form",
+    "pagesTooFew": "Minimum: a quarter page (0.25)",
+    "pagesTooMany": "Maximum: 604 pages"
   },
 
   "registration": {
@@ -245,7 +247,32 @@
     "name": "Student Name",
     "memorizationPages": "Memorization Pages",
     "reviewPages": "Review Pages",
-    "progress": "Progress"
+    "progress": "Progress",
+    "contact": "Contact",
+    "noPhone": "No phone",
+    "activation": "Activation"
+  },
+
+  "feedback": {
+    "button": "Complaints & suggestions",
+    "title": "Complaints & suggestions",
+    "subtitle": "Write your complaint or suggestion. You will be redirected to the messaging app to send it.",
+    "placeholder": "Type your message here...",
+    "send": "Send",
+    "messageRequired": "Please write a message before sending",
+    "telegramMissing": "Complaints Telegram username is not configured yet. Please notify the administration.",
+    "openedTelegram": "Telegram opened to send the message",
+    "bodyHeader": "New complaint / suggestion:",
+    "fieldName": "Name",
+    "fieldRole": "Role",
+    "fieldHalaqah": "Halaqah",
+    "fieldMessage": "Message",
+    "noHalaqah": "None"
+  },
+
+  "social": {
+    "youtube": "YouTube",
+    "telegram": "Telegram"
   },
 
   "report": {
@@ -326,6 +353,7 @@
     "facebookUrl": "Facebook URL",
     "instagramUrl": "Instagram URL",
     "whatsappNumber": "WhatsApp number",
+    "complaintsTelegram": "Telegram username for complaints",
     "emailAddress": "Email address",
     "save": "Save changes",
     "saveSuccess": "Settings saved successfully",
@@ -475,6 +503,8 @@
     "suspend": "Suspend",
     "reactivate": "Reactivate",
     "userUpdated": "User updated successfully",
+    "studentActivated": "Student account activated",
+    "studentSuspended": "Student account suspended",
     "manageSupervisors": "Manage supervisors",
     "halaqahSupervisorsList": "Halaqah supervisors",
     "noSupervisorsAssigned": "No supervisors assigned to this halaqah",
