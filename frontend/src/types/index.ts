@@ -186,9 +186,17 @@ export interface AcademyStats {
 }
 
 // Time Slot
+//
+// `id` is the canonical "HH-HH" string stored in `profiles.available_times`.
+// `startHour` is the integer 0..23 driving display formatting; consumers
+// pass the active language to `formatSlotRange()` to render the localized
+// 12h label (e.g. "9:00 صباحًا – 11:00 صباحًا"). We deliberately do NOT
+// bake a static `label` into this shape because the displayed string is
+// language-dependent and slot labels must update when the user toggles
+// between Arabic and English.
 export interface TimeSlot {
   id: string;
-  label: string;
+  startHour: number;
 }
 
 // Surah
