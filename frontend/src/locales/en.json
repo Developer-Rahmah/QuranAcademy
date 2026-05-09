@@ -95,7 +95,8 @@
     "agreementRequired": "Please agree to terms and conditions",
     "fixErrors": "Please fix the errors in the form",
     "pagesTooFew": "Minimum: a quarter page (0.25)",
-    "pagesTooMany": "Maximum: 604 pages"
+    "pagesTooMany": "Maximum: 604 pages",
+    "reportDateFuture": "Future-dated reports are not allowed"
   },
 
   "registration": {
@@ -109,7 +110,7 @@
     "fillAllRequired": "Please fill in all required fields",
     "firstName": "First Name",
     "secondName": "Father's Name",
-    "thirdName": "Grandfather's Name",
+    "thirdName": "Family Name",
     "age": "Age",
     "country": "Country",
     "phone": "Phone Number",
@@ -136,7 +137,11 @@
     "submitRegistration": "Register",
     "backToSignup": "Back to sign up",
     "successTitle": "Registration Successful!",
-    "successMessage": "Thank you for registering at the Quran Memorization Academy. Your application will be reviewed and we will contact you soon.",
+    "successMessage": "Thank you for registering at Wahdaynak Academy",
+    "successDetail": "Your application will be reviewed and we will contact you soon.",
+    "successWhatsapp": "We will contact you via WhatsApp once your details have been reviewed by the administration.",
+    "successProcessingTime": "Review may take 1–3 business days",
+    "successHeadline": "Your registration has been submitted successfully",
     "backToLogin": "Back to login"
   },
 
@@ -279,6 +284,7 @@
     "title": "Reports",
     "recentReports": "Recent Reports",
     "addReport": "Add New Report",
+    "addReportSubtitle": "Log your daily Quran memorization and review progress",
     "editReport": "Edit Report",
     "reportDate": "Report Date",
     "memorization": "New Memorization",
@@ -292,9 +298,20 @@
     "removeItem": "Remove",
     "submitReport": "Submit Report",
     "submitSuccess": "Report submitted successfully",
+    "saveChanges": "Save Changes",
+    "updateSuccess": "Report updated successfully",
+    "deleteSuccess": "Report deleted successfully",
+    "deleteConfirmTitle": "Delete report",
+    "deleteConfirmBody": "Are you sure you want to delete this report? This cannot be undone.",
+    "deleteFailed": "Failed to delete the report",
+    "updateFailed": "Failed to update the report",
+    "editPageTitle": "Edit report",
+    "editPageSubtitle": "Update the details of a previously submitted report",
     "atLeastOneItem": "Please add at least one item",
     "selectSurah": "Select Surah",
-    "enterPages": "Enter number of pages"
+    "enterPages": "Enter number of pages",
+    "loadFailed": "Could not load the report",
+    "notFound": "Report not found"
   },
 
   "progress": {

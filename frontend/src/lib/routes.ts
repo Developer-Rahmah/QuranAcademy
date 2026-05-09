@@ -26,7 +26,13 @@ export const ROUTES = {
   adminSettings: '/admin/settings',
   halaqahDetails: '/halaqah/:id',
   reportNew: '/report/new',
+  reportEdit: '/report/:id/edit',
 } as const;
+
+/** Build a /report/:id/edit URL for a report id. */
+export function reportEditPath(reportId: string): string {
+  return `/report/${reportId}/edit`;
+}
 
 /** Build an /admin/users/:id URL from a user id. */
 export function adminUserDetailPath(userId: string): string {

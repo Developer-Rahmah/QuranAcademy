@@ -43,3 +43,7 @@ export type { SocialLinksVariant, SocialLinksSize } from './SocialLinks';
 
 // DashboardViewSwitcher
 export { DashboardViewSwitcher } from './DashboardViewSwitcher';
+
+// ConfirmDialog
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps } from './ConfirmDialog';

@@ -16,3 +16,4 @@ export { AdminUserDetail } from './AdminUserDetail';
 export { AdminSettings } from './AdminSettings';
 export { HalaqahDetails } from './HalaqahDetails';
 export { AddReport } from './AddReport';
+export { EditReport } from './EditReport';

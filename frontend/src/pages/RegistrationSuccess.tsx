@@ -3,11 +3,14 @@ import { AuthLayout, AuthCard } from '../components/templates/AuthLayout';
 import { Button } from '../components/atoms/Button';
 import { Card } from '../components/molecules/Card';
 import { CheckCircleIcon, ChatIcon } from '../components/atoms/Icon';
+import { useTranslation } from '../locales/i18n';
 
 /**
  * Registration Success Page - Shown after successful registration
  */
 export function RegistrationSuccess() {
+  const { t } = useTranslation();
+
   return (
     <AuthLayout>
       <AuthCard>
@@ -20,10 +23,10 @@ export function RegistrationSuccess() {
           {/* Title */}
           <div>
             <h1 className="text-xl font-medium text-foreground mb-2">
-              تم إرسال طلب التسجيل بنجاح
+              {t('registration.successHeadline')}
             </h1>
             <p className="text-muted">
-              شكراً لك على التسجيل في أكاديمية تحفيظ القرآن الكريم
+              {t('registration.successMessage')}
             </p>
           </div>
 
@@ -32,20 +35,20 @@ export function RegistrationSuccess() {
             <div className="flex items-start gap-3">
               <ChatIcon className="w-5 h-5 text-muted flex-shrink-0 mt-0.5" />
               <p className="text-sm text-muted text-start">
-                سيتم التواصل معك عبر واتساب بعد مراجعة البيانات من قبل الإدارة
+                {t('registration.successWhatsapp')}
               </p>
             </div>
           </Card>
 
           {/* Processing time */}
           <p className="text-sm text-muted">
-            قد تستغرق المراجعة من 1-3 أيام عمل
+            {t('registration.successProcessingTime')}
           </p>
 
           {/* Back to login button */}
           <Link to="/login">
             <Button size="full">
-              العودة إلى تسجيل الدخول
+              {t('registration.backToLogin')}
             </Button>
           </Link>
         </div>

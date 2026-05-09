@@ -1,14 +1,21 @@
 /**
  * ReportForm Component
- * Form for submitting daily memorization/review reports
- * With proper profile guards and toast notifications
+ * Form for submitting OR editing daily memorization/review reports.
+ *
+ * Two modes, single component:
+ *   - create (default): no `report` prop, builds a fresh row.
+ *   - edit:             pass `report`, fields pre-fill, submit
+ *                       patches the row + replaces its items.
+ *
+ * Reusing one form keeps validation, item layout, surah catalog, and
+ * date-cap rules in lockstep between the two flows.
  */
-import { useState, FormEvent } from 'react';
+import { useState, useMemo, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
-import { useCreateReport } from '../../../hooks/useReports';
+import { useCreateReport, useUpdateReport } from '../../../hooks/useReports';
 import { useStudentHalaqah } from '../../../hooks/useHalaqah';
 import { Button } from '../../atoms/Button';
 import { Select } from '../../atoms/Select';
@@ -25,18 +32,35 @@ import {
 import { getErrorMessage } from '../../../lib/errorHandler';
 import { reportFormStyles } from './ReportForm.style';
 import type { ReportItem, FormErrors, ReportFormProps } from './ReportForm.types';
-import type { ReportType } from '../../../types';
+import type { ReportType, ReportItem as DomainReportItem } from '../../../types';
+
+// ============================================
+// Helpers
+// ============================================
+function toFormItems(items: DomainReportItem[] | undefined, type: ReportType): ReportItem[] {
+  return (items ?? [])
+    .filter((it) => it.type === type)
+    .map((it) => ({
+      id: generateId(),
+      surah_name: it.surah_name,
+      pages: String(it.pages),
+    }));
+}
 
 // ============================================
 // ReportForm Component
 // ============================================
-export function ReportForm({ className }: ReportFormProps) {
+export function ReportForm({ className, report = null }: ReportFormProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { profile } = useAuth();
   const { membership, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
-  const { createReport, loading: submitting } = useCreateReport();
+  const { createReport, loading: creating } = useCreateReport();
+  const { updateReport, loading: updating } = useUpdateReport();
+
+  const isEditMode = !!report;
+  const submitting = creating || updating;
 
   // Form state.
   //
@@ -50,11 +74,36 @@ export function ReportForm({ className }: ReportFormProps) {
   // `formatDateISO` was switched to local components the +1 hack began
   // rendering tomorrow. The hack is gone; this is the canonical source.
   const today = getTodayLocalDate();
-  const [reportDate, setReportDate] = useState(today);
-  const [memorizationItems, setMemorizationItems] = useState<ReportItem[]>([
-    { id: generateId(), surah_name: '', pages: '' },
-  ]);
-  const [reviewItems, setReviewItems] = useState<ReportItem[]>([]);
+
+  const initialMemorization = useMemo(
+    () =>
+      isEditMode
+        ? toFormItems(report?.items, REPORT_TYPES.MEMORIZATION as ReportType)
+        : [{ id: generateId(), surah_name: '', pages: '' }],
+    // We only want to seed once per `report.id` — re-running on every
+    // render would clobber unsaved input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [report?.id],
+  );
+  const initialReview = useMemo(
+    () =>
+      isEditMode
+        ? toFormItems(report?.items, REPORT_TYPES.REVIEW as ReportType)
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [report?.id],
+  );
+  // Memorization needs at least one editable row even in edit mode in
+  // case the original report had only review items — the form's
+  // remove-row guard already enforces a minimum of 1.
+  const seededMemorization =
+    initialMemorization.length > 0
+      ? initialMemorization
+      : [{ id: generateId(), surah_name: '', pages: '' }];
+
+  const [reportDate, setReportDate] = useState(report?.report_date ?? today);
+  const [memorizationItems, setMemorizationItems] = useState<ReportItem[]>(seededMemorization);
+  const [reviewItems, setReviewItems] = useState<ReportItem[]>(initialReview);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState('');
 
@@ -109,6 +158,13 @@ export function ReportForm({ className }: ReportFormProps) {
   // ============================================
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
+
+    // Future dates are blocked at the picker (max=today) AND here, so
+    // pasted / typed values can't slip past. RLS enforces the same
+    // constraint server-side.
+    if (reportDate && reportDate > today) {
+      newErrors.report_date = t('validation.reportDateFuture');
+    }
 
     // Validate memorization items
     memorizationItems.forEach((item) => {
@@ -179,7 +235,11 @@ export function ReportForm({ className }: ReportFormProps) {
       return;
     }
 
-    if (!membership?.halaqah_id) {
+    // Edit mode reuses the report's existing halaqah_id, so a student
+    // who has been moved between halaqahs can still fix yesterday's
+    // report even if they no longer belong to the original halaqah
+    // record. Create mode still requires an active membership.
+    if (!isEditMode && !membership?.halaqah_id) {
       const errorMsg = t('errors.noHalaqah');
       setSubmitError(errorMsg);
       toast.error(errorMsg);
@@ -204,11 +264,28 @@ export function ReportForm({ className }: ReportFormProps) {
         })),
     ];
 
-    // Create report
+    if (isEditMode && report) {
+      const { error } = await updateReport(
+        report.id,
+        { report_date: reportDate },
+        items,
+      );
+      if (error) {
+        const errorMsg = getErrorMessage(error);
+        setSubmitError(errorMsg);
+        toast.error(errorMsg);
+        return;
+      }
+      toast.success(t('report.updateSuccess'));
+      navigate('/dashboard');
+      return;
+    }
+
+    // Create flow
     const { error } = await createReport(
       {
         student_id: profile.id,
-        halaqah_id: membership.halaqah_id,
+        halaqah_id: membership!.halaqah_id,
         report_date: reportDate,
       },
       items
@@ -221,7 +298,6 @@ export function ReportForm({ className }: ReportFormProps) {
       return;
     }
 
-    // Success!
     toast.success(t('report.submitSuccess'));
     navigate('/dashboard');
   };
@@ -283,7 +359,9 @@ export function ReportForm({ className }: ReportFormProps) {
   // ============================================
   // Loading State
   // ============================================
-  if (loadingHalaqah) {
+  // In edit mode the halaqah lookup isn't required (we use the report's
+  // own halaqah_id), so we don't gate the render on that fetch.
+  if (!isEditMode && loadingHalaqah) {
     return (
       <div className={reportFormStyles.loading.wrapper}>
         <div className={reportFormStyles.loading.spinner} />
@@ -294,7 +372,7 @@ export function ReportForm({ className }: ReportFormProps) {
   // ============================================
   // No Halaqah State
   // ============================================
-  if (!membership && !loadingHalaqah) {
+  if (!isEditMode && !membership && !loadingHalaqah) {
     return (
       <Card>
         <CardContent className={reportFormStyles.noHalaqah}>
@@ -315,6 +393,9 @@ export function ReportForm({ className }: ReportFormProps) {
       {/* Error Messages */}
       {submitError && <div className={reportFormStyles.error}>{submitError}</div>}
       {errors.general && <div className={reportFormStyles.error}>{errors.general}</div>}
+      {errors.report_date && (
+        <div className={reportFormStyles.error}>{errors.report_date}</div>
+      )}
 
       {/* Date Field */}
       <Card>
@@ -396,7 +477,7 @@ export function ReportForm({ className }: ReportFormProps) {
           loading={submitting}
           className={reportFormStyles.actions.submit}
         >
-          {t('report.submitReport')}
+          {isEditMode ? t('report.saveChanges') : t('report.submitReport')}
         </Button>
         <Button
           type="button"

@@ -1,11 +1,17 @@
 /**
  * ReportList Component
- * List of reports with items grouped by date
+ * List of reports with items grouped by date.
+ *
+ * Optionally renders per-row edit/delete actions when the parent
+ * passes `onEdit` / `onDelete`. The component is purely presentational
+ * — the parent owns the confirmation flow and the API calls. This
+ * keeps the list reusable for surfaces (teacher view, admin view)
+ * that should NOT expose edit/delete.
  */
 import { useTranslation } from '../../../locales/i18n';
 import { Card } from '../../molecules/Card';
 import { Badge } from '../../atoms/Badge';
-import { CalendarIcon } from '../../atoms/Icon';
+import { CalendarIcon, EditIcon, TrashIcon } from '../../atoms/Icon';
 import { REPORT_TYPES } from '../../../lib/constants';
 import { reportListStyles, reportCardStyles, reportSummaryStyles } from './ReportList.style';
 import type { ReportListProps, ReportCardProps, ReportSummaryProps } from './ReportList.types';
@@ -13,7 +19,12 @@ import type { ReportListProps, ReportCardProps, ReportSummaryProps } from './Rep
 /**
  * ReportList - List of reports with items grouped by date
  */
-export function ReportList({ reports = [], loading = false }: ReportListProps) {
+export function ReportList({
+  reports = [],
+  loading = false,
+  onEdit,
+  onDelete,
+}: ReportListProps) {
   const { t } = useTranslation();
 
   if (loading) {
@@ -37,7 +48,12 @@ export function ReportList({ reports = [], loading = false }: ReportListProps) {
   return (
     <div className={reportListStyles.list}>
       {reports.map((report) => (
-        <ReportCard key={report.id} report={report} />
+        <ReportCard
+          key={report.id}
+          report={report}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       ))}
     </div>
   );
@@ -46,7 +62,7 @@ export function ReportList({ reports = [], loading = false }: ReportListProps) {
 /**
  * ReportCard - Single report card with items
  */
-export function ReportCard({ report }: ReportCardProps) {
+export function ReportCard({ report, onEdit, onDelete }: ReportCardProps) {
   const { t } = useTranslation();
 
   const memorizationItems =
@@ -62,6 +78,8 @@ export function ReportCard({ report }: ReportCardProps) {
     (sum, item) => sum + parseFloat(String(item.pages)),
     0
   );
+
+  const showActions = !!onEdit || !!onDelete;
 
   return (
     <Card padding="md">
@@ -94,6 +112,33 @@ export function ReportCard({ report }: ReportCardProps) {
           </div>
         ))}
       </div>
+
+      {showActions && (
+        <div className={reportCardStyles.actions.wrapper}>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(report)}
+              className={`${reportCardStyles.actions.button} ${reportCardStyles.actions.edit}`}
+              aria-label={t('common.edit')}
+            >
+              <EditIcon className={reportCardStyles.actions.icon} />
+              <span>{t('common.edit')}</span>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(report)}
+              className={`${reportCardStyles.actions.button} ${reportCardStyles.actions.delete}`}
+              aria-label={t('common.delete')}
+            >
+              <TrashIcon className={reportCardStyles.actions.icon} />
+              <span>{t('common.delete')}</span>
+            </button>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
