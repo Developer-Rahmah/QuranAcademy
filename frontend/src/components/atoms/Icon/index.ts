@@ -20,6 +20,8 @@ export {
   ChatIcon,
   ChartIcon,
   EyeIcon,
+  EditIcon,
+  TrashIcon,
   FacebookIcon,
   InstagramIcon,
   WhatsappIcon,

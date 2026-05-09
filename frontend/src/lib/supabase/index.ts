@@ -68,9 +68,13 @@ export const db = {
   reports: {
     getByStudent: reportsApi.byStudent,
     getByHalaqah: reportsApi.byHalaqah,
+    getById:      reportsApi.byId,
     create:       reportsApi.create,
+    update:       reportsApi.update,
+    remove:       reportsApi.remove,
     addItem:      reportsApi.addItem,
     addItems:     reportsApi.addItems,
+    replaceItems: reportsApi.replaceItems,
   },
   stats: {
     getStudentProgress: reportsApi.stats.studentProgress,

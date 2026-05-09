@@ -43,6 +43,7 @@ import {
   AdminSettings,
   HalaqahDetails,
   AddReport,
+  EditReport,
 } from "./pages";
 import type { ReactNode } from "react";
 import type { UserRole } from "./types";
@@ -525,6 +526,16 @@ function AppRoutes() {
                 student, so the route must let them through. */}
             <RoleGuard allow={["student", "halaqah_supervisor"]}>
               <AddReport />
+            </RoleGuard>
+          </AuthGuard>
+        }
+      />
+      <Route
+        path={ROUTES.reportEdit}
+        element={
+          <AuthGuard>
+            <RoleGuard allow={["student", "halaqah_supervisor"]}>
+              <EditReport />
             </RoleGuard>
           </AuthGuard>
         }

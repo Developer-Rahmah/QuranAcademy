@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { useStudentHalaqah } from "../hooks/useHalaqah";
-import { useStudentReports, useStudentProgress } from "../hooks/useReports";
+import {
+  useStudentReports,
+  useStudentProgress,
+  useDeleteReport,
+} from "../hooks/useReports";
 import {
   DashboardLayout,
   PageSection,
@@ -10,13 +16,16 @@ import { Card } from "../components/molecules/Card";
 import { StatCard, StatCardRow } from "../components/molecules/StatCard";
 import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
 import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwitcher";
+import { ConfirmDialog } from "../components/molecules/ConfirmDialog";
 import { Button } from "../components/atoms/Button";
 import { SaveIcon, RefreshIcon, PlusIcon } from "../components/atoms/Icon";
 import { getDisplayName } from "../lib/utils";
+import { getErrorMessage } from "../lib/errorHandler";
 import { TOTAL_QURAN_PAGES } from "../lib/constants";
 import { useTranslation } from "../locales/i18n";
 import { uiText } from "../lib/uiText";
 import { ReportList } from "@/components/organisms";
+import type { ReportWithItems } from "@/components/organisms";
 
 /**
  * Student Dashboard Page
@@ -24,14 +33,48 @@ import { ReportList } from "@/components/organisms";
 export function StudentDashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const toast = useToast();
   const { profile } = useAuth();
   const { halaqah, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
-  const { reports, loading: loadingReports } = useStudentReports(profile?.id);
-  const { progress, loading: loadingProgress } = useStudentProgress(
-    profile?.id,
+  const {
+    reports,
+    loading: loadingReports,
+    refetch: refetchReports,
+  } = useStudentReports(profile?.id);
+  const { progress, loading: loadingProgress, refetch: refetchProgress } =
+    useStudentProgress(profile?.id);
+  const { deleteReport, loading: deleting } = useDeleteReport();
+
+  // Confirmation modal state for the delete flow.
+  const [pendingDelete, setPendingDelete] = useState<ReportWithItems | null>(
+    null,
   );
 
   const isLoading = loadingHalaqah || loadingReports || loadingProgress;
+
+  const handleEdit = (report: ReportWithItems) => {
+    navigate(`/report/${report.id}/edit`);
+  };
+
+  const handleDeleteRequest = (report: ReportWithItems) => {
+    setPendingDelete(report);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDelete) return;
+
+    const { error } = await deleteReport(pendingDelete.id);
+    if (error) {
+      toast.error(getErrorMessage(error) || t("report.deleteFailed"));
+      return;
+    }
+
+    setPendingDelete(null);
+    toast.success(t("report.deleteSuccess"));
+    // Refetch list + progress so the deleted row + its pages are gone
+    // from both surfaces immediately.
+    await Promise.all([refetchReports(), refetchProgress()]);
+  };
 
   return (
     <DashboardLayout
@@ -75,26 +118,26 @@ export function StudentDashboard() {
           </PageSection>
 
           {/* Progress Summary */}
-          <PageSection title="ملخص التقدم">
+          <PageSection title={t('progress.summary')}>
             <StatCardRow>
               <StatCard
-                title="صفحات الحفظ"
+                title={t('progress.memorizationPages')}
                 value={progress.memorization}
                 icon={SaveIcon}
-                subtitle="صفحة"
+                subtitle={t('common.page')}
                 variant="primary"
               />
               <StatCard
-                title="صفحات المراجعة"
+                title={t('progress.reviewPages')}
                 value={progress.review}
                 icon={RefreshIcon}
-                subtitle="صفحة"
+                subtitle={t('common.page')}
               />
               <StatCard
-                title="نسبة الإنجاز الكلية"
+                title={t('progress.totalProgress')}
                 value={`${progress.progress}%`}
                 progress={progress.progress}
-                progressLabel={`${progress.memorization} من ${TOTAL_QURAN_PAGES} صفحة`}
+                progressLabel={`${progress.memorization} ${t('progress.ofTotal')} ${TOTAL_QURAN_PAGES} ${t('common.page')}`}
               />
             </StatCardRow>
           </PageSection>
@@ -107,16 +150,31 @@ export function StudentDashboard() {
               className="px-8"
             >
               <PlusIcon className="w-5 h-5" />
-              رفع تقرير جديد
+              {t('report.addReport')}
             </Button>
           </div>
 
           {/* Recent Reports */}
-          <PageSection title="التقارير الأخيرة">
-            <ReportList reports={reports} loading={loadingReports} />
+          <PageSection title={t('report.recentReports')}>
+            <ReportList
+              reports={reports}
+              loading={loadingReports}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+            />
           </PageSection>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => (deleting ? undefined : setPendingDelete(null))}
+        onConfirm={handleDeleteConfirm}
+        title={t("report.deleteConfirmTitle")}
+        body={t("report.deleteConfirmBody")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        loading={deleting}
+      />
     </DashboardLayout>
   );
 }
