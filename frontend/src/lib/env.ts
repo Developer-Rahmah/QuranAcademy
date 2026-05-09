@@ -9,6 +9,14 @@
 interface AppEnv {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
+  /**
+   * Base URL of the complaints/suggestions backend (the service in
+   * `backend/complaints-api/`). Optional — when empty the FeedbackModal
+   * surfaces a "service not configured" error instead of trying to
+   * POST. We keep it optional so local dev / preview deploys can run
+   * the SPA without standing up the side service first.
+   */
+  COMPLAINTS_API_URL: string;
   IS_DEV: boolean;
   IS_PROD: boolean;
 }
@@ -23,11 +31,16 @@ function required(key: string, value: string | undefined): string {
   return value;
 }
 
+function optional(value: string | undefined): string {
+  return value ? value.trim().replace(/\/+$/, '') : '';
+}
+
 const raw = import.meta.env;
 
 export const env: Readonly<AppEnv> = Object.freeze({
   SUPABASE_URL: required('VITE_SUPABASE_URL', raw.VITE_SUPABASE_URL),
   SUPABASE_ANON_KEY: required('VITE_SUPABASE_ANON_KEY', raw.VITE_SUPABASE_ANON_KEY),
+  COMPLAINTS_API_URL: optional(raw.VITE_COMPLAINTS_API_URL),
   IS_DEV: !!raw.DEV,
   IS_PROD: !!raw.PROD,
 });
