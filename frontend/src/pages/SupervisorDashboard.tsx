@@ -19,40 +19,38 @@
  *   - api.halaqah.members.byHalaqah(...)      → members joined to profile
  *   - api.reports.byHalaqah(halaqah_id, 500)  → recent reports + items
  */
-import { useEffect, useState } from 'react';
-import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
-import { Card, CardContent } from '../components/molecules/Card';
-import { DashboardViewSwitcher } from '../components/molecules/DashboardViewSwitcher';
-import { Badge } from '../components/atoms/Badge';
-import { Button } from '../components/atoms/Button';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { useTranslation } from '../locales/i18n';
-import { api } from '../lib/supabase';
-import { uiText } from '../lib/uiText';
-import { getDisplayName, getFullName, buildWhatsAppLink } from '../lib/utils';
-import { segmentationRules } from '../lib/segmentationRules';
+import { useEffect, useState } from "react";
+import {
+  DashboardLayout,
+  PageSection,
+} from "../components/templates/DashboardLayout";
+import { Card, CardContent } from "../components/molecules/Card";
+import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwitcher";
+import { Badge } from "../components/atoms/Badge";
+import { Button } from "../components/atoms/Button";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useTranslation } from "../locales/i18n";
+import { api } from "../lib/supabase";
+import { uiText } from "../lib/uiText";
+import { getDisplayName, getFullName, buildWhatsAppLink } from "../lib/utils";
+import { segmentationRules } from "../lib/segmentationRules";
 import {
   canManageStudentActivation,
   canContactStudents,
-} from '../lib/permissions';
-import type {
-  AccountStatus,
-  Halaqah,
-  HalaqahMember,
-  Report,
-} from '../types';
+} from "../lib/permissions";
+import type { AccountStatus, Halaqah, HalaqahMember, Report } from "../types";
 
 // ---------------- Local types -----------------------------------------
 
-type Tier = 'excellent' | 'good' | 'weak' | 'inactive';
+type Tier = "excellent" | "good" | "weak" | "inactive";
 
 /** Per-day record used by the expandable 7-day breakdown. */
 interface DailyEntry {
-  dayKey: string;          // YYYY-MM-DD (local)
-  date: Date;              // start-of-day local Date for label rendering
+  dayKey: string; // YYYY-MM-DD (local)
+  date: Date; // start-of-day local Date for label rendering
   reported: boolean;
-  memorization: number;    // pages summed across reports submitted that day
+  memorization: number; // pages summed across reports submitted that day
   review: number;
 }
 
@@ -72,7 +70,7 @@ interface StudentRow {
   reports30d: number;
   consistency30: number; // 0..100, distinct days reported / 30
   tier: Tier;
-  last7Days: boolean[];  // length 7, index 0 = 6 days ago, index 6 = today
+  last7Days: boolean[]; // length 7, index 0 = 6 days ago, index 6 = today
   memorizationPages: number;
   reviewPages: number;
   lastReportDate: string | null;
@@ -88,9 +86,9 @@ interface HalaqahPanel {
   students: StudentRow[];
   // Aggregates surfaced in the panel header.
   reports30dTotal: number;
-  engagedCount: number;       // students with consistency >= 50
+  engagedCount: number; // students with consistency >= 50
   topReporter: StudentRow | null;
-  needsAttention: number;     // students with tier 'weak' or 'inactive'
+  needsAttention: number; // students with tier 'weak' or 'inactive'
 }
 
 // ---------------- Helpers ---------------------------------------------
@@ -100,8 +98,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Local YYYY-MM-DD key (timezone-stable for grouping). */
 function localDayKey(d: Date): string {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -116,31 +114,33 @@ function diffDaysFromToday(iso: string, now = new Date()): number {
 }
 
 function tierFor(consistency: number): Tier {
-  if (consistency >= 80) return 'excellent';
-  if (consistency >= 50) return 'good';
-  if (consistency >= 20) return 'weak';
-  return 'inactive';
+  if (consistency >= 80) return "excellent";
+  if (consistency >= 50) return "good";
+  if (consistency >= 20) return "weak";
+  return "inactive";
 }
 
-function tierBadgeVariant(t: Tier): 'success' | 'primary' | 'warning' | 'destructive' {
-  if (t === 'excellent') return 'success';
-  if (t === 'good') return 'primary';
-  if (t === 'weak') return 'warning';
-  return 'destructive';
+function tierBadgeVariant(
+  t: Tier,
+): "success" | "primary" | "warning" | "destructive" {
+  if (t === "excellent") return "success";
+  if (t === "good") return "primary";
+  if (t === "weak") return "warning";
+  return "destructive";
 }
 
 function tierBarClass(t: Tier): string {
-  if (t === 'excellent') return 'bg-emerald-500';
-  if (t === 'good') return 'bg-primary';
-  if (t === 'weak') return 'bg-amber-500';
-  return 'bg-rose-500';
+  if (t === "excellent") return "bg-emerald-500";
+  if (t === "good") return "bg-primary";
+  if (t === "weak") return "bg-amber-500";
+  return "bg-rose-500";
 }
 
 function tierLabelKey(t: Tier): string {
-  if (t === 'excellent') return 'supervisor.tierExcellent';
-  if (t === 'good') return 'supervisor.tierGood';
-  if (t === 'weak') return 'supervisor.tierWeak';
-  return 'supervisor.tierInactive';
+  if (t === "excellent") return "supervisor.tierExcellent";
+  if (t === "good") return "supervisor.tierGood";
+  if (t === "weak") return "supervisor.tierWeak";
+  return "supervisor.tierInactive";
 }
 
 // ---------------- Row builder -----------------------------------------
@@ -179,8 +179,8 @@ function buildStudentRow(
     let mem = 0;
     let rev = 0;
     for (const it of r.items ?? []) {
-      if (it.type === 'memorization') mem += it.pages;
-      else if (it.type === 'review') rev += it.pages;
+      if (it.type === "memorization") mem += it.pages;
+      else if (it.type === "review") rev += it.pages;
     }
     memorizationPages += mem;
     reviewPages += rev;
@@ -288,12 +288,13 @@ export function SupervisorDashboard() {
   // the matching row on success so the panel reflects the change
   // without a full refetch.
   const handleToggleActivation = async (row: StudentRow) => {
-    const next: AccountStatus = row.status === 'active' ? 'suspended' : 'active';
+    const next: AccountStatus =
+      row.status === "active" ? "suspended" : "active";
     setActivationLoadingId(row.id);
     try {
       const { error } = await api.profiles.setStudentStatus(row.id, next);
       if (error) {
-        toast.error(error.message || t('errors.unauthorized'));
+        toast.error(error.message || t("errors.unauthorized"));
         return;
       }
       setPanels((prev) =>
@@ -305,15 +306,15 @@ export function SupervisorDashboard() {
         })),
       );
       toast.success(
-        next === 'active'
-          ? t('admin.studentActivated')
-          : t('admin.studentSuspended'),
+        next === "active"
+          ? t("admin.studentActivated")
+          : t("admin.studentSuspended"),
       );
       // Self-suspend: refresh own profile so AuthProvider's active-status
       // guard fires immediately. Without this the suspending user keeps
       // their stale 'active' profile until the next visibility change /
       // navigation event.
-      if (row.id === profile?.id && next !== 'active') {
+      if (row.id === profile?.id && next !== "active") {
         await refreshProfile();
       }
     } finally {
@@ -328,7 +329,9 @@ export function SupervisorDashboard() {
     const run = async () => {
       setLoading(true);
       try {
-        const { data: assignments } = await api.supervisors.listByUser(profile.id);
+        const { data: assignments } = await api.supervisors.listByUser(
+          profile.id,
+        );
         const ids = (assignments ?? []).map((a) => a.halaqah_id);
 
         if (ids.length === 0) {
@@ -359,14 +362,16 @@ export function SupervisorDashboard() {
             }
 
             const students: StudentRow[] = members
-              .map((m) => buildStudentRow(m, reportsByStudent[m.student_id] ?? [], now))
+              .map((m) =>
+                buildStudentRow(m, reportsByStudent[m.student_id] ?? [], now),
+              )
               // Sort: highest consistency first, then most recently active.
               .sort((a, b) => {
                 if (b.consistency30 !== a.consistency30) {
                   return b.consistency30 - a.consistency30;
                 }
-                const aLast = a.lastReportDate ?? '';
-                const bLast = b.lastReportDate ?? '';
+                const aLast = a.lastReportDate ?? "";
+                const bLast = b.lastReportDate ?? "";
                 return bLast.localeCompare(aLast);
               });
 
@@ -375,13 +380,15 @@ export function SupervisorDashboard() {
               (acc, s) => acc + s.reports30d,
               0,
             );
-            const engagedCount = students.filter((s) => s.consistency30 >= 50).length;
+            const engagedCount = students.filter(
+              (s) => s.consistency30 >= 50,
+            ).length;
             const topReporter =
               students.length > 0 && students[0].consistency30 > 0
                 ? students[0]
                 : null;
             const needsAttention = students.filter(
-              (s) => s.tier === 'weak' || s.tier === 'inactive',
+              (s) => s.tier === "weak" || s.tier === "inactive",
             ).length;
 
             return {
@@ -397,7 +404,9 @@ export function SupervisorDashboard() {
 
         if (cancelled) return;
 
-        const valid = built.filter((p): p is HalaqahPanel => p.halaqah !== null);
+        const valid = built.filter(
+          (p): p is HalaqahPanel => p.halaqah !== null,
+        );
         setPanels(valid);
       } finally {
         if (!cancelled) setLoading(false);
@@ -413,7 +422,10 @@ export function SupervisorDashboard() {
   // ----- Loading ------------------------------------------------------
   if (loading) {
     return (
-      <DashboardLayout title={t('supervisor.title')} subtitle={t('supervisor.subtitle')}>
+      <DashboardLayout
+        title={t("supervisor.title")}
+        subtitle={t("supervisor.subtitle")}
+      >
         <DashboardViewSwitcher />
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -425,12 +437,15 @@ export function SupervisorDashboard() {
   // ----- No assignments ----------------------------------------------
   if (panels.length === 0) {
     return (
-      <DashboardLayout title={t('supervisor.title')} subtitle={t('supervisor.subtitle')}>
+      <DashboardLayout
+        title={t("supervisor.title")}
+        subtitle={t("supervisor.subtitle")}
+      >
         <DashboardViewSwitcher />
         <Card padding="lg">
           <CardContent>
             <p className="text-center text-muted text-base py-8">
-              {t('supervisor.noAssignments')}
+              {t("supervisor.noAssignments")}
             </p>
           </CardContent>
         </Card>
@@ -440,15 +455,18 @@ export function SupervisorDashboard() {
 
   // ----- Helpers used inside render ----------------------------------
   const formatRecency = (s: StudentRow): string => {
-    if (s.daysSinceLast === null) return t('supervisor.noActivity');
-    if (s.daysSinceLast <= 0) return t('supervisor.today');
-    if (s.daysSinceLast === 1) return t('supervisor.yesterday');
-    return t('supervisor.daysAgo').replace('{{n}}', String(s.daysSinceLast));
+    if (s.daysSinceLast === null) return t("supervisor.noActivity");
+    if (s.daysSinceLast <= 0) return t("supervisor.today");
+    if (s.daysSinceLast === 1) return t("supervisor.yesterday");
+    return t("supervisor.daysAgo").replace("{{n}}", String(s.daysSinceLast));
   };
 
   // ----- Render ------------------------------------------------------
   return (
-    <DashboardLayout title={t('supervisor.title')} subtitle={t('supervisor.subtitle')}>
+    <DashboardLayout
+      title={t("supervisor.title")}
+      subtitle={t("supervisor.subtitle")}
+    >
       {/* Dual-role accounts (student + supervisor) get a top-level
           view switcher. Renders nothing for pure supervisors. */}
       <DashboardViewSwitcher />
@@ -456,15 +474,15 @@ export function SupervisorDashboard() {
         {panels.map((panel) => {
           const { halaqah, students } = panel;
           const ui = segmentationRules.getGenderedUI({
-            role: 'teacher',
+            role: "teacher",
             segment: halaqah.segment,
           });
           const segmentKey =
-            halaqah.segment === 'men'
-              ? 'segment.men'
-              : halaqah.segment === 'women'
-              ? 'segment.women'
-              : '';
+            halaqah.segment === "men"
+              ? "segment.men"
+              : halaqah.segment === "women"
+                ? "segment.women"
+                : "";
 
           return (
             <PageSection
@@ -475,7 +493,7 @@ export function SupervisorDashboard() {
                 {/* Halaqah meta */}
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <span className="text-base text-muted">
-                    {t('supervisor.halaqahName')}:
+                    {t("supervisor.halaqahName")}:
                   </span>
                   <span className="text-base font-medium text-foreground">
                     {halaqah.name}
@@ -489,27 +507,27 @@ export function SupervisorDashboard() {
                     quick read of the halaqah's overall health. */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                   <SummaryStat
-                    label={t('supervisor.summaryReports30')}
+                    label={t("supervisor.summaryReports30")}
                     value={String(panel.reports30dTotal)}
                   />
                   <SummaryStat
-                    label={t('supervisor.summaryActive')}
+                    label={t("supervisor.summaryActive")}
                     value={`${panel.engagedCount} / ${students.length}`}
                   />
                   <SummaryStat
-                    label={t('supervisor.summaryTopReporter')}
-                    value={panel.topReporter?.name ?? t('supervisor.noneYet')}
+                    label={t("supervisor.summaryTopReporter")}
+                    value={panel.topReporter?.name ?? t("supervisor.noneYet")}
                   />
                   <SummaryStat
-                    label={t('supervisor.summaryNeedsAttention')}
+                    label={t("supervisor.summaryNeedsAttention")}
                     value={String(panel.needsAttention)}
-                    accent={panel.needsAttention > 0 ? 'warning' : undefined}
+                    accent={panel.needsAttention > 0 ? "warning" : undefined}
                   />
                 </div>
 
                 {students.length === 0 ? (
                   <p className="text-sm text-muted">
-                    {t('supervisor.noStudents')}
+                    {t("supervisor.noStudents")}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -518,34 +536,34 @@ export function SupervisorDashboard() {
                         <tr>
                           <th className="px-3 py-2 w-8" aria-hidden="true" />
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.studentName')}
+                            {t("supervisor.studentName")}
                           </th>
                           {canSeeContact && (
                             <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                              {t('student.contact')}
+                              {t("student.contact")}
                             </th>
                           )}
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.consistency30')}
+                            {t("supervisor.consistency30")}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.last7Days')}
+                            {t("supervisor.last7Days")}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.memorizationPages')}
+                            {t("supervisor.memorizationPages")}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.reviewPages')}
+                            {t("supervisor.reviewPages")}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.totalReports')}
+                            {t("supervisor.totalReports")}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t('supervisor.lastActivity')}
+                            {t("supervisor.lastActivity")}
                           </th>
                           {canActivate && (
                             <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                              {t('student.activation')}
+                              {t("student.activation")}
                             </th>
                           )}
                         </tr>
@@ -577,7 +595,7 @@ export function SupervisorDashboard() {
                 )}
 
                 <p className="text-sm text-muted mt-3">
-                  {t(uiText.getStudentLabel(halaqah.segment, 'plural'))}:{' '}
+                  {t(uiText.getStudentLabel(halaqah.segment, "plural"))}:{" "}
                   {students.length}
                 </p>
               </Card>
@@ -598,15 +616,15 @@ function SummaryStat({
 }: {
   label: string;
   value: string;
-  accent?: 'warning';
+  accent?: "warning";
 }) {
   return (
     <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
       <div className="text-xs text-muted mb-1">{label}</div>
       <div
         className={
-          'text-base font-semibold ' +
-          (accent === 'warning' ? 'text-amber-600' : 'text-foreground')
+          "text-base font-semibold " +
+          (accent === "warning" ? "text-amber-600" : "text-foreground")
         }
       >
         {value}
@@ -631,13 +649,11 @@ function ConsistencyCell({
     <div className="flex flex-col gap-1 min-w-[140px]">
       <div className="flex items-center justify-between gap-2">
         <Badge variant={tierBadgeVariant(tier)}>{tierLabel}</Badge>
-        <span className="text-sm text-muted tabular-nums">
-          {reports30d}/30
-        </span>
+        <span className="text-sm text-muted tabular-nums">{reports30d}/30</span>
       </div>
       <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
         <div
-          className={'h-full rounded-full transition-all ' + tierBarClass(tier)}
+          className={"h-full rounded-full transition-all " + tierBarClass(tier)}
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -650,13 +666,13 @@ function ConsistencyCell({
 // reuse the project's translated weekday names instead of inventing new
 // ones. Index order: Sun, Mon, Tue, Wed, Thu, Fri, Sat.
 const WEEKDAY_KEYS: readonly string[] = [
-  'timeSlots.sunday',
-  'timeSlots.monday',
-  'timeSlots.tuesday',
-  'timeSlots.wednesday',
-  'timeSlots.thursday',
-  'timeSlots.friday',
-  'timeSlots.saturday',
+  "timeSlots.sunday",
+  "timeSlots.monday",
+  "timeSlots.tuesday",
+  "timeSlots.wednesday",
+  "timeSlots.thursday",
+  "timeSlots.friday",
+  "timeSlots.saturday",
 ];
 
 function weekdayKey(d: Date): string {
@@ -666,8 +682,8 @@ function weekdayKey(d: Date): string {
 function shortDate(d: Date): string {
   // Locale-neutral DD/MM — date itself is already absolute, no need
   // to switch on language for numerals.
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}`;
 }
 
@@ -704,7 +720,7 @@ function FragmentRow({
   // colSpan). 6 fixed columns + name + optional contact + optional
   // activation. Keeps the breakdown row spanning the full table width.
   const summaryColSpan = 6 + (showContact ? 1 : 0) + (showActivation ? 1 : 0);
-  const isActive = student.status === 'active';
+  const isActive = student.status === "active";
   const activationLoading = activationLoadingId === student.id;
   const whatsappLink = student.phone ? buildWhatsAppLink(student.phone) : null;
 
@@ -718,8 +734,7 @@ function FragmentRow({
         <td className="px-3 py-3 text-muted text-center select-none w-8">
           <span
             className={
-              'inline-block transition-transform ' +
-              (isOpen ? 'rotate-90' : '')
+              "inline-block transition-transform " + (isOpen ? "rotate-90" : "")
             }
             aria-hidden="true"
           >
@@ -747,7 +762,7 @@ function FragmentRow({
                 </a>
               ) : (
                 <span className="text-sm text-muted">
-                  {t('student.noPhone')}
+                  {t("student.noPhone")}
                 </span>
               )}
               {student.email && (
@@ -793,11 +808,11 @@ function FragmentRow({
           >
             <Button
               size="sm"
-              variant={isActive ? 'destructive' : 'success'}
+              variant={isActive ? "destructive" : "success"}
               loading={activationLoading}
               onClick={() => onToggleActivation(student)}
             >
-              {isActive ? t('admin.suspend') : t('admin.activate')}
+              {isActive ? t("admin.suspend") : t("admin.activate")}
             </Button>
           </td>
         )}
@@ -834,26 +849,26 @@ function WeekBreakdown({
   return (
     <div className="rounded-lg border border-border bg-card p-3">
       <div className="text-sm font-medium text-foreground mb-2">
-        {t('supervisor.weekDetails')}
+        {t("supervisor.weekDetails")}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/30">
             <tr>
               <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                {t('supervisor.dayHeader')}
+                {t("supervisor.dayHeader")}
               </th>
               <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                {t('supervisor.dateHeader')}
+                {t("supervisor.dateHeader")}
               </th>
               <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                {t('supervisor.reportStatus')}
+                {t("supervisor.reportStatus")}
               </th>
               <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                {t('supervisor.memorizationPages')}
+                {t("supervisor.memorizationPages")}
               </th>
               <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                {t('supervisor.reviewPages')}
+                {t("supervisor.reviewPages")}
               </th>
             </tr>
           </thead>
@@ -867,21 +882,21 @@ function WeekBreakdown({
                   {shortDate(entry.date)}
                 </td>
                 <td className="px-3 py-2">
-                  <Badge variant={entry.reported ? 'success' : 'destructive'}>
+                  <Badge variant={entry.reported ? "success" : "destructive"}>
                     {entry.reported
-                      ? t('supervisor.submitted')
-                      : t('supervisor.notSubmitted')}
+                      ? t("supervisor.submitted")
+                      : t("supervisor.notSubmitted")}
                   </Badge>
                 </td>
                 <td className="px-3 py-2 text-foreground tabular-nums">
                   {entry.reported && entry.memorization > 0
                     ? entry.memorization
-                    : t('supervisor.noPages')}
+                    : t("supervisor.noPages")}
                 </td>
                 <td className="px-3 py-2 text-foreground tabular-nums">
                   {entry.reported && entry.review > 0
                     ? entry.review
-                    : t('supervisor.noPages')}
+                    : t("supervisor.noPages")}
                 </td>
               </tr>
             ))}
@@ -900,8 +915,8 @@ function DotStrip({ days }: { days: boolean[] }) {
         <span
           key={i}
           className={
-            'inline-block w-2.5 h-2.5 rounded-full ' +
-            (reported ? 'bg-emerald-500' : 'bg-muted/60')
+            "inline-block w-2.5 h-2.5 rounded-full " +
+            (reported ? "bg-emerald-500" : "bg-muted/60")
           }
         />
       ))}
