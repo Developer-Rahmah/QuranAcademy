@@ -2,7 +2,33 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+
+    <!--
+      ====================================================================
+      Favicon set
+      ====================================================================
+      Order matters for crawler / browser selection:
+
+        1. `favicon.ico` with `sizes="any"` — the universal fallback that
+           Google Search and older browsers fetch from `/favicon.ico`.
+           The bundled file embeds 16×16, 32×32, and 48×48 PNG images
+           (Google's preferred crawl size is 48×48).
+        2. PNG variants at exact pixel sizes — modern browsers pick the
+           closest match for the tab strip.
+        3. SVG variant — modern browsers prefer this for crisp scaling
+           on hi-dpi displays.
+        4. `apple-touch-icon` — iOS home-screen / Safari pinned tab.
+
+      The icons live in `/public` and Vite copies them verbatim into
+      the build output, so each one resolves at the site root after
+      deploy (`/favicon.ico`, `/favicon-32x32.png`, …).
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0F4C3A" />
 

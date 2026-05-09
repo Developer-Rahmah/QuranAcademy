@@ -13,7 +13,14 @@
       "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -n \"DashboardLayout\\\\|AuthLayout\\\\|<Header\\\\|<main\\\\|return \\(\" \"{}\" | head -8')",
       "Bash(node scripts/generate-sitemap.mjs)",
       "Bash(tee /tmp/tsc.log)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(command -v sips magick convert)",
+      "Bash(command -v node npm)",
+      "Bash(sips -s format png -z 16 16 wahdaynakacademylogo.png --out favicon-16x16.png)",
+      "Bash(sips -s format png -z 32 32 wahdaynakacademylogo.png --out favicon-32x32.png)",
+      "Bash(sips -s format png -z 48 48 wahdaynakacademylogo.png --out favicon-48x48.png)",
+      "Bash(sips -s format png -z 180 180 wahdaynakacademylogo.png --out apple-touch-icon.png)",
+      "Bash(node scripts/generate-favicon-ico.mjs)"
     ]
   }
 }
