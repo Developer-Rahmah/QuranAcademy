@@ -306,6 +306,59 @@
     "ofTotal": "of"
   },
 
+  "seo": {
+    "defaultTitle": "Wahdaynak Academy — Online Quran Learning & Memorization",
+    "defaultDescription": "Wahdaynak Academy: online Quran memorization, tajweed and ijazah programs taught by qualified teachers — structured halaqahs and personal follow-up for every student.",
+    "home": {
+      "title": "Wahdaynak Academy — Learn & Memorize the Quran Online",
+      "description": "Learn, memorize, and perfect the recitation of the Holy Quran with experienced teachers at Wahdaynak Academy — structured halaqahs, ijazah pathways, and personal follow-up."
+    },
+    "login": {
+      "title": "Log in",
+      "description": "Log in to your Wahdaynak Academy account to continue your halaqahs and lessons."
+    },
+    "signup": {
+      "title": "Create an account",
+      "description": "Create your Wahdaynak Academy account to join Quran memorization halaqahs and learn the sciences of the Quran."
+    },
+    "registerStudent": {
+      "title": "Register as a student",
+      "description": "Register as a student at Wahdaynak Academy to join Quran memorization, review and mastery halaqahs."
+    },
+    "registerTeacher": {
+      "title": "Register as a teacher",
+      "description": "Join Wahdaynak Academy as a Quran teacher and help students complete their memorization journey."
+    },
+    "forgotPassword": {
+      "title": "Forgot password",
+      "description": "Recover access to your Wahdaynak Academy account by resetting your password."
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your Wahdaynak Academy account."
+    },
+    "success": {
+      "title": "Registration successful",
+      "description": "Your registration request to Wahdaynak Academy was received successfully."
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Wahdaynak Academy account dashboard."
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Wahdaynak Academy administration."
+    },
+    "halaqah": {
+      "title": "Halaqah details",
+      "description": "Halaqah details and student performance at Wahdaynak Academy."
+    },
+    "report": {
+      "title": "New report",
+      "description": "Add a memorization and review report at Wahdaynak Academy."
+    }
+  },
+
   "academy": {
     "title": "Wahdaynak Academy",
     "subtitle": "for the Noble Quran and its Sciences",

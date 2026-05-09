@@ -68,7 +68,12 @@ export type { LogoSize } from './Logo';
 // LanguageSwitcher
 export { LanguageSwitcher } from './LanguageSwitcher';
 
-// Canonical — global `<link rel="canonical">` manager. Mount once
-// inside <BrowserRouter>; it reads the current pathname and keeps the
-// head tag in sync. Renders nothing.
-export { Canonical, buildCanonicalUrl } from './Canonical';
+// Canonical — kept as a focused atom that ONLY manages the canonical
+// link tag, in case any caller needs it independent of the full SEO
+// stack. New code should prefer <Seo />.
+export { Canonical } from './Canonical';
+
+// Seo — global owner of every SEO head tag (title, description,
+// keywords, robots, canonical, Open Graph, Twitter). Mount once
+// inside <BrowserRouter> + <I18nProvider>. Renders nothing.
+export { Seo, buildCanonicalUrl } from './Seo';

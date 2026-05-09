@@ -1,0 +1,22 @@
+# Wahdaynak Academy — robots.txt
+#
+# Public marketing surfaces and registration pages are crawlable.
+# Authenticated areas (dashboards, admin, per-halaqah views, report
+# entry) are blocked because they require a session and would only
+# emit "redirect to /login" responses to a crawler — useless for the
+# index and noisy in coverage reports.
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /halaqah/
+Disallow: /report/
+Disallow: /reset-password
+
+# Auth forms — uncomment to also keep them out of search results.
+# Disallow: /login
+# Disallow: /signup
+# Disallow: /forgot-password
+
+Sitemap: https://www.wahdaynakacademy.com/sitemap.xml
