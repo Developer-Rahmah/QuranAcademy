@@ -14,16 +14,16 @@
  * role as soon as the profile hydrates (asynchronously) to redirect to the
  * role-specific home.
  */
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { ToastProvider, useToast } from './context/ToastContext';
-import { SettingsProvider } from './context/SettingsContext';
-import { DashboardViewProvider } from './context/DashboardViewContext';
-import { I18nProvider, useTranslation } from './locales/i18n';
-import { ROUTES, dashboardPathForRole } from './lib/routes';
-import { api } from './lib/supabase';
-import { isUserSupervisor } from './lib/permissions';
+import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ToastProvider, useToast } from "./context/ToastContext";
+import { SettingsProvider } from "./context/SettingsContext";
+import { DashboardViewProvider } from "./context/DashboardViewContext";
+import { I18nProvider, useTranslation } from "./locales/i18n";
+import { ROUTES, dashboardPathForRole } from "./lib/routes";
+import { api } from "./lib/supabase";
+import { isUserSupervisor } from "./lib/permissions";
 import {
   Landing,
   Login,
@@ -42,17 +42,18 @@ import {
   AdminSettings,
   HalaqahDetails,
   AddReport,
-} from './pages';
-import type { ReactNode } from 'react';
-import type { UserRole } from './types';
+} from "./pages";
+import type { ReactNode } from "react";
+import type { UserRole } from "./types";
 
 // ============================================
 // Styles
 // ============================================
 const appStyles = {
-  loadingWrapper: 'min-h-screen flex items-center justify-center bg-background',
-  loadingSpinner: 'animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full',
-  appContainer: 'font-sans antialiased min-h-screen bg-background',
+  loadingWrapper: "min-h-screen flex items-center justify-center bg-background",
+  loadingSpinner:
+    "animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full",
+  appContainer: "font-sans antialiased min-h-screen bg-background",
 };
 
 // ============================================
@@ -111,8 +112,8 @@ function RoleGuard({ allow, children }: RoleGuardProps) {
 
   // If profile loaded but account isn't active, sign out cleanly.
   useEffect(() => {
-    if (profile && profile.status !== 'active') {
-      toast.warning('حسابك غير مفعل. يرجى انتظار موافقة الإدارة.');
+    if (profile && profile.status !== "active") {
+      toast.warning("حسابك غير مفعل. يرجى انتظار موافقة الإدارة.");
       void signOut();
     }
   }, [profile, signOut, toast]);
@@ -122,7 +123,7 @@ function RoleGuard({ allow, children }: RoleGuardProps) {
   // Profile fetch completed but returned nothing — treat as fatal.
   if (!profile) return <Navigate to={ROUTES.login} replace />;
 
-  if (profile.status !== 'active') {
+  if (profile.status !== "active") {
     return <Navigate to={ROUTES.login} replace />;
   }
 
@@ -142,14 +143,18 @@ interface PublicRouteProps {
 }
 
 function PublicRoute({ children }: PublicRouteProps) {
-  const { user, profile, loading, isRecoverySession } = useAuth();
+  const { user, loading, isRecoverySession } = useAuth();
 
   if (loading) return <LoadingSpinner />;
 
-  // Only auto-redirect when we have a fully-hydrated, active profile AND
-  // we're not in the middle of a password-recovery flow.
-  if (user && profile && profile.status === 'active' && !isRecoverySession) {
-    return <Navigate to={dashboardPathForRole(profile.role)} replace />;
+  // Redirect to dashboard if authenticated, EXCEPT during a recovery
+  // flow. We redirect on `user` alone (not waiting for the profile)
+  // so browser-back from /dashboard to / / /login immediately bounces
+  // forward — without flashing the landing/login page to a logged-in
+  // user. The /dashboard route's AuthGuard + RoleGuard handle pending
+  // and suspended accounts from there.
+  if (user && !isRecoverySession) {
+    return <Navigate to={ROUTES.dashboard} replace />;
   }
 
   return <>{children}</>;
@@ -167,22 +172,24 @@ function PublicRoute({ children }: PublicRouteProps) {
  * when they hold both student and supervisor capabilities. Cleared on
  * logout (which wipes sessionStorage).
  */
-const SUPERVISOR_VIEW_KEY = 'wahdaynak.supervisor.view';
+const SUPERVISOR_VIEW_KEY = "wahdaynak.supervisor.view";
 
 function DashboardDispatcher() {
   const { user, profile, loading, profileLoading } = useAuth();
   const { t } = useTranslation();
 
-  const [supervisorView, setSupervisorView] = useState<'student' | 'supervisor' | null>(
-    () => {
-      if (typeof window === 'undefined') return null;
-      const v = window.sessionStorage.getItem(SUPERVISOR_VIEW_KEY);
-      return v === 'student' || v === 'supervisor' ? v : null;
-    },
-  );
+  const [supervisorView, setSupervisorView] = useState<
+    "student" | "supervisor" | null
+  >(() => {
+    if (typeof window === "undefined") return null;
+    const v = window.sessionStorage.getItem(SUPERVISOR_VIEW_KEY);
+    return v === "student" || v === "supervisor" ? v : null;
+  });
 
   // Halaqah supervisor assignments — RELATIONAL source of truth.
-  const [assignments, setAssignments] = useState<Array<{ halaqah_id: string }> | null>(null);
+  const [assignments, setAssignments] = useState<Array<{
+    halaqah_id: string;
+  }> | null>(null);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
 
   useEffect(() => {
@@ -191,16 +198,20 @@ function DashboardDispatcher() {
     // supervisors. Teachers and admins never need this query, and on
     // production it sometimes stalls — running it for every role made
     // every dashboard wait ~30s before rendering.
-    if (profile.role === 'teacher' || profile.role === 'admin' || profile.role === 'supervisor_manager') {
+    if (
+      profile.role === "teacher" ||
+      profile.role === "admin" ||
+      profile.role === "supervisor_manager"
+    ) {
       setAssignments([]);
       return;
     }
     let cancelled = false;
 
-    console.log('AUTH USER ID', user?.id);
-    console.log('PROFILE ID', profile.id);
+    // Surface only the actual mismatch case (auth.uid != profiles.id).
+    // Routine "user/profile id" trace logs were noise on every login.
     if (user?.id && user.id !== profile.id) {
-      console.error('ID MISMATCH', { authId: user?.id, profileId: profile.id });
+      console.error("ID MISMATCH", { authId: user?.id, profileId: profile.id });
     }
 
     setAssignmentsLoading(true);
@@ -210,7 +221,7 @@ function DashboardDispatcher() {
         if (cancelled) return;
         setAssignments(data ?? []);
         if (error) {
-          console.error('Supervisor fetch error', error);
+          console.error("Supervisor fetch error", error);
           // Don't toast for halaqah_supervisor-with-no-rows — that's a
           // benign data state, not a failure. The operator already sees
           // a clean dashboard. Loud toasting on every dashboard mount
@@ -233,7 +244,7 @@ function DashboardDispatcher() {
 
   // Admin / supervisor_manager paths short-circuit straight to /admin.
   // No supervisor logic applies to them.
-  if (profile.role === 'admin' || profile.role === 'supervisor_manager') {
+  if (profile.role === "admin" || profile.role === "supervisor_manager") {
     return <Navigate to={ROUTES.admin} replace />;
   }
 
@@ -243,7 +254,7 @@ function DashboardDispatcher() {
   // assignments fetch (if any) hydrates in the background — that's the
   // fix for the ~30s blank screen on every login.
   if (
-    supervisorView === 'supervisor' &&
+    supervisorView === "supervisor" &&
     (assignmentsLoading || assignments === null)
   ) {
     return <LoadingSpinner />;
@@ -253,32 +264,32 @@ function DashboardDispatcher() {
 
   const isSupervisor = isUserSupervisor(assignments ?? []);
 
-  const choose = (next: 'student' | 'supervisor') => {
+  const choose = (next: "student" | "supervisor") => {
     window.sessionStorage.setItem(SUPERVISOR_VIEW_KEY, next);
     setSupervisorView(next);
   };
   const clearChoice = () => {
     window.sessionStorage.removeItem(SUPERVISOR_VIEW_KEY);
-    setSupervisorView('student');
+    setSupervisorView("student");
   };
 
   // Empty-state guard: a user who chose "supervisor" but has no
   // assignments (e.g. assignments revoked between sessions, or admin
   // toggled profile.role manually). Show a clear message + a button to
   // fall back to the student dashboard. Never blank screen.
-  if (supervisorView === 'supervisor' && !isSupervisor) {
+  if (supervisorView === "supervisor" && !isSupervisor) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 max-w-md w-full text-center space-y-4">
           <p className="text-base text-foreground">
-            {t('auth.noHalaqahsToSupervise')}
+            {t("auth.noHalaqahsToSupervise")}
           </p>
           <button
             type="button"
             onClick={clearChoice}
             className="w-full px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition"
           >
-            {t('auth.backToStudent')}
+            {t("auth.backToStudent")}
           </button>
         </div>
       </div>
@@ -293,22 +304,22 @@ function DashboardDispatcher() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="bg-card rounded-2xl shadow-lg p-6 sm:p-8 max-w-md w-full text-center space-y-4">
           <h2 className="text-xl font-semibold text-foreground">
-            {t('auth.supervisorRoleQuestion')}
+            {t("auth.supervisorRoleQuestion")}
           </h2>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
-              onClick={() => choose('student')}
+              onClick={() => choose("student")}
               className="flex-1 px-4 py-3 rounded-lg border border-border bg-card text-foreground hover:bg-secondary transition"
             >
-              {t('auth.continueAsStudent')}
+              {t("auth.continueAsStudent")}
             </button>
             <button
               type="button"
-              onClick={() => choose('supervisor')}
+              onClick={() => choose("supervisor")}
               className="flex-1 px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition"
             >
-              {t('auth.continueAsSupervisor')}
+              {t("auth.continueAsSupervisor")}
             </button>
           </div>
         </div>
@@ -320,16 +331,18 @@ function DashboardDispatcher() {
   // account is BOTH supervisor (has assignments) AND able to act as a
   // student (i.e. not a teacher — teachers don't need this switcher).
   // Teachers fall through to TeacherDashboard with no switcher exposed.
-  const canSwitch = isSupervisor && profile.role !== 'teacher';
-  const viewValue: 'student' | 'supervisor' =
-    supervisorView === 'supervisor' ? 'supervisor' : 'student';
+  const canSwitch = isSupervisor && profile.role !== "teacher";
+  const viewValue: "student" | "supervisor" =
+    supervisorView === "supervisor" ? "supervisor" : "student";
 
   // Active supervisor session — dedicated read-only dashboard. NOT the
   // TeacherDashboard: a halaqah supervisor has different responsibilities
   // (oversight, no edit) and the UI must reflect that.
-  if (isSupervisor && supervisorView === 'supervisor') {
+  if (isSupervisor && supervisorView === "supervisor") {
     return (
-      <DashboardViewProvider value={{ view: viewValue, switchTo: choose, canSwitch }}>
+      <DashboardViewProvider
+        value={{ view: viewValue, switchTo: choose, canSwitch }}
+      >
         <SupervisorDashboard />
       </DashboardViewProvider>
     );
@@ -339,18 +352,20 @@ function DashboardDispatcher() {
   // with no assignments is treated as a regular student per the spec
   // (data drift / cleanup case). Teacher and student fall through here.
   switch (profile.role) {
-    case 'teacher':
+    case "teacher":
       return (
         <RoleGuard allow="teacher">
           <TeacherDashboard />
         </RoleGuard>
       );
-    case 'student':
-    case 'halaqah_supervisor':
+    case "student":
+    case "halaqah_supervisor":
     default:
       return (
-        <RoleGuard allow={['student', 'halaqah_supervisor']}>
-          <DashboardViewProvider value={{ view: viewValue, switchTo: choose, canSwitch }}>
+        <RoleGuard allow={["student", "halaqah_supervisor"]}>
+          <DashboardViewProvider
+            value={{ view: viewValue, switchTo: choose, canSwitch }}
+          >
             <StudentDashboard />
           </DashboardViewProvider>
         </RoleGuard>
@@ -364,19 +379,71 @@ function DashboardDispatcher() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public Routes */}
-      {/* Landing is always reachable — no PublicRoute guard so signed-in
-          users can still visit marketing without being bounced to dashboard. */}
-      <Route path={ROUTES.home}             element={<Landing />} />
-      <Route path={ROUTES.login}            element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path={ROUTES.signup}           element={<PublicRoute><Signup /></PublicRoute>} />
-      <Route path={ROUTES.forgotPassword}   element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+      {/* Public Routes — every public surface (including the landing
+          page) is wrapped in PublicRoute so an authenticated user who
+          presses browser-back never lands on marketing. PublicRoute
+          redirects to /dashboard the moment a session exists. The only
+          exception is /reset-password (declared below) — its recovery
+          session must NOT be bounced. */}
+      <Route
+        path={ROUTES.home}
+        element={
+          <PublicRoute>
+            <Landing />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.login}
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.signup}
+        element={
+          <PublicRoute>
+            <Signup />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.forgotPassword}
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
       {/* /reset-password intentionally has no guard: a recovery session must
           not be bounced to /dashboard. */}
-      <Route path={ROUTES.resetPassword}    element={<ResetPassword />} />
-      <Route path={ROUTES.registerStudent}  element={<PublicRoute><StudentRegistration /></PublicRoute>} />
-      <Route path={ROUTES.registerTeacher}  element={<PublicRoute><TeacherRegistration /></PublicRoute>} />
-      <Route path={ROUTES.success}          element={<PublicRoute><RegistrationSuccess /></PublicRoute>} />
+      <Route path={ROUTES.resetPassword} element={<ResetPassword />} />
+      <Route
+        path={ROUTES.registerStudent}
+        element={
+          <PublicRoute>
+            <StudentRegistration />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.registerTeacher}
+        element={
+          <PublicRoute>
+            <TeacherRegistration />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.success}
+        element={
+          <PublicRoute>
+            <RegistrationSuccess />
+          </PublicRoute>
+        }
+      />
 
       {/* Authenticated Routes */}
       <Route
@@ -391,7 +458,7 @@ function AppRoutes() {
         path={ROUTES.admin}
         element={
           <AuthGuard>
-            <RoleGuard allow={['admin', 'supervisor_manager']}>
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
               <AdminDashboard />
             </RoleGuard>
           </AuthGuard>
@@ -401,7 +468,7 @@ function AppRoutes() {
         path={ROUTES.adminUsers}
         element={
           <AuthGuard>
-            <RoleGuard allow={['admin', 'supervisor_manager']}>
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
               <AdminUsers />
             </RoleGuard>
           </AuthGuard>
@@ -411,7 +478,7 @@ function AppRoutes() {
         path={ROUTES.adminUserDetail}
         element={
           <AuthGuard>
-            <RoleGuard allow={['admin', 'supervisor_manager']}>
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
               <AdminUserDetail />
             </RoleGuard>
           </AuthGuard>
@@ -433,7 +500,14 @@ function AppRoutes() {
         path={ROUTES.halaqahDetails}
         element={
           <AuthGuard>
-            <RoleGuard allow={['admin', 'teacher', 'supervisor_manager', 'halaqah_supervisor']}>
+            <RoleGuard
+              allow={[
+                "admin",
+                "teacher",
+                "supervisor_manager",
+                "halaqah_supervisor",
+              ]}
+            >
               <HalaqahDetails />
             </RoleGuard>
           </AuthGuard>
@@ -448,7 +522,7 @@ function AppRoutes() {
                 does not strip their student capability. The dispatcher
                 already treats a supervisor in `student` view as a regular
                 student, so the route must let them through. */}
-            <RoleGuard allow={['student', 'halaqah_supervisor']}>
+            <RoleGuard allow={["student", "halaqah_supervisor"]}>
               <AddReport />
             </RoleGuard>
           </AuthGuard>
@@ -469,11 +543,11 @@ function DirectionShell({ children }: { children: ReactNode }) {
   const { language, isRTL } = useTranslation();
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
-    root.setAttribute('lang', language);
+    root.setAttribute("dir", isRTL ? "rtl" : "ltr");
+    root.setAttribute("lang", language);
   }, [language, isRTL]);
   return (
-    <div dir={isRTL ? 'rtl' : 'ltr'} className={appStyles.appContainer}>
+    <div dir={isRTL ? "rtl" : "ltr"} className={appStyles.appContainer}>
       {children}
     </div>
   );

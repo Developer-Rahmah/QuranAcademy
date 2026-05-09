@@ -2,6 +2,7 @@
  * Header Component
  * Dashboard header with user info and logout
  */
+import { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useTranslation } from '../../../locales/i18n';
 import { Button } from '../../atoms/Button';
@@ -9,6 +10,7 @@ import { UserIcon, LogoutIcon } from '../../atoms/Icon';
 import { Logo } from '../../atoms/Logo';
 import { LanguageSwitcher } from '../../atoms/LanguageSwitcher';
 import { getDisplayName } from '../../../lib/utils';
+import { FeedbackModal } from '../FeedbackModal';
 import { headerStyles } from './Header.style';
 import { segmentationRules } from '../../../lib/segmentationRules';
 
@@ -18,6 +20,7 @@ import { segmentationRules } from '../../../lib/segmentationRules';
 export function Header() {
   const { t } = useTranslation();
   const { profile, signOut, loading } = useAuth();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
@@ -47,9 +50,16 @@ export function Header() {
             <Logo size="sm" />
           </div>
 
-          {/* Language switcher + logout button - Left side in RTL */}
+          {/* Language switcher + feedback + logout — Left side in RTL */}
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              {t('feedback.button')}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -63,6 +73,10 @@ export function Header() {
           </div>
         </div>
       </div>
+      <FeedbackModal
+        isOpen={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </header>
   );
 }

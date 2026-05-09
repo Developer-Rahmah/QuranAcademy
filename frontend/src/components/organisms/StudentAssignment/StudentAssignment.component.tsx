@@ -8,7 +8,7 @@ import { Button } from '../../atoms/Button';
 import { Input } from '../../atoms/Input';
 import { Badge } from '../../atoms/Badge';
 import { PlusIcon, UsersIcon } from '../../atoms/Icon';
-import { db } from '../../../lib/supabase';
+import { db, api } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
 import { canStudentJoinHalaqah } from '../../../lib/domain/roleRules';
@@ -118,16 +118,57 @@ export function StudentAssignment({
     }
   };
 
-  // Remove student from halaqah
+  // Remove student from halaqah.
+  //
+  // 1) Optimistic local update — drop the row from `assignedStudents`
+  //    immediately so the UI reflects the action even if the network
+  //    is slow / the modal is closed before the refetch finishes.
+  // 2) Delete the halaqah_members row. On error, restore the snapshot.
+  // 3) ALSO delete any halaqah_supervisors row for the same
+  //    (user_id, halaqah_id). A student can simultaneously be a
+  //    supervisor of the halaqah they're a member of, and the two
+  //    relations are independent — without this cascade, removing a
+  //    student left a stale supervisor row + badge behind.
+  //    The delete is idempotent (zero matching rows is not an error),
+  //    so it's safe to call unconditionally.
+  // 4) Refetch the modal's own student lists.
+  // 5) Trigger the parent refetch so HalaqahDetails re-derives both
+  //    members and supervisors from the now-clean DB state.
   const removeStudent = async (memberId: string) => {
     setActionLoading(memberId);
+    const target = assignedStudents.find(
+      (s) => s.membership?.id === memberId,
+    );
+    const studentId = target?.id;
+    const snapshot = assignedStudents;
+    setAssignedStudents((prev) =>
+      prev.filter((s) => s.membership?.id !== memberId),
+    );
     try {
       const { error } = await db.members.remove(memberId);
 
       if (error) {
         console.error('Error removing student:', error);
         toast.error(t('errors.generic'));
+        setAssignedStudents(snapshot);
         return;
+      }
+
+      // Cascade: clean up the halaqah_supervisors row (if any). This is
+      // a soft-fail — the membership delete already succeeded, so we
+      // log + warn-toast but don't roll back the primary action.
+      if (studentId) {
+        const { error: supError } = await api.supervisors.remove(
+          studentId,
+          halaqahId,
+        );
+        if (supError) {
+          console.error(
+            'Failed to clean up supervisor relation:',
+            supError,
+          );
+          toast.warning(t('admin.supervisorRemoveFailed'));
+        }
       }
 
       toast.success(t('admin.studentRemoved'));
@@ -136,6 +177,7 @@ export function StudentAssignment({
     } catch (err) {
       console.error('Error removing student:', err);
       toast.error(t('errors.generic'));
+      setAssignedStudents(snapshot);
     } finally {
       setActionLoading(null);
     }

@@ -20,8 +20,13 @@ import { getDisplayName } from '../lib/utils';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
 import { segmentationRules } from '../lib/segmentationRules';
 import { uiText } from '../lib/uiText';
-import { canManageHalaqah, canManageSupervisors } from '../lib/permissions';
-import type { StudentWithProgress } from '../types';
+import {
+  canManageHalaqah,
+  canManageSupervisors,
+  canContactStudents,
+  canManageStudentActivation,
+} from '../lib/permissions';
+import type { AccountStatus, StudentWithProgress } from '../types';
 
 interface HalaqahStats {
   totalMemorization: number;
@@ -55,10 +60,42 @@ export function HalaqahDetails() {
   // halaqah supervisors). Other roles never see the management UI.
   const canManage = canManageHalaqah(profile?.role);
   const canManageSupervisorList = canManageSupervisors(profile?.role);
+  // Activation toggle: admin / supervisor_manager / teacher /
+  // halaqah_supervisor. Backend RPC enforces the per-student scope so
+  // showing the button to a teacher doesn't grant access to students
+  // outside their halaqahs — RLS / RPC will refuse.
+  const canActivate = canManageStudentActivation(profile?.role);
   const { halaqah, members, loading: loadingHalaqah, refetch } = useHalaqah(id);
 
   const [students, setStudents] = useState<StudentWithProgress[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
+  const [activationLoadingId, setActivationLoadingId] = useState<string | null>(null);
+
+  // Toggle a student's account status. The next status flips between
+  // 'active' (when previously suspended/pending) and 'suspended' (when
+  // currently active). Backend authorization runs in the RPC — we
+  // surface its error verbatim so RLS denials show up in the toast
+  // instead of being swallowed.
+  const handleToggleActivation = async (student: StudentWithProgress) => {
+    const next: AccountStatus =
+      student.status === 'active' ? 'suspended' : 'active';
+    setActivationLoadingId(student.id);
+    try {
+      const { error } = await api.profiles.setStudentStatus(student.id, next);
+      if (error) {
+        toast.error(error.message || t('errors.unauthorized'));
+        return;
+      }
+      toast.success(
+        next === 'active' ? t('admin.studentActivated') : t('admin.studentSuspended'),
+      );
+      // Re-pull members so the row's new status reflects in the UI
+      // without us having to mirror it locally.
+      refetch?.();
+    } finally {
+      setActivationLoadingId(null);
+    }
+  };
   const [halaqahStats, setHalaqahStats] = useState<HalaqahStats>({
     totalMemorization: 0,
     avgMemorization: 0,
@@ -165,7 +202,15 @@ export function HalaqahDetails() {
 
             return {
               id: member.student_id,
-              ...member.student,
+              first_name: member.student?.first_name ?? '',
+              second_name: member.student?.second_name ?? '',
+              // third_name + status come from the joined select in
+              // members.byHalaqah (now includes both). Fall through
+              // gracefully for older shapes that omit them.
+              third_name: member.student?.third_name,
+              phone: member.student?.phone,
+              email: member.student?.email,
+              status: member.student?.status,
               memorizationPages: memPages,
               reviewPages: progressData?.review || 0,
               progress: progressData?.progress || 0,
@@ -317,6 +362,10 @@ export function HalaqahDetails() {
             loading={loadingStudents}
             showReportsButton={false}
             segment={halaqah?.segment}
+            showContact={canContactStudents(profile?.role)}
+            showActivation={canActivate}
+            activationLoadingId={activationLoadingId}
+            onToggleActivation={handleToggleActivation}
           />
         </PageSection>
 
@@ -437,7 +486,15 @@ export function HalaqahDetails() {
             halaqah={halaqah}
             isOpen={showStudentAssignment}
             onClose={() => setShowStudentAssignment(false)}
-            onSuccess={() => refetch?.()}
+            // Refetch BOTH members and supervisors. Removing a student
+            // who is also a halaqah supervisor cascades through both
+            // tables (see StudentAssignment.removeStudent), so the page
+            // must re-derive both lists or the supervisors panel will
+            // render a stale badge for a now-removed student.
+            onSuccess={() => {
+              refetch?.();
+              void fetchSupervisors();
+            }}
           />
         </>
       )}

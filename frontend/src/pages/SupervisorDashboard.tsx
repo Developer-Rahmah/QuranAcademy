@@ -24,13 +24,20 @@ import { DashboardLayout, PageSection } from '../components/templates/DashboardL
 import { Card, CardContent } from '../components/molecules/Card';
 import { DashboardViewSwitcher } from '../components/molecules/DashboardViewSwitcher';
 import { Badge } from '../components/atoms/Badge';
+import { Button } from '../components/atoms/Button';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useTranslation } from '../locales/i18n';
 import { api } from '../lib/supabase';
 import { uiText } from '../lib/uiText';
-import { getDisplayName } from '../lib/utils';
+import { getDisplayName, getFullName, buildWhatsAppLink } from '../lib/utils';
 import { segmentationRules } from '../lib/segmentationRules';
+import {
+  canManageStudentActivation,
+  canContactStudents,
+} from '../lib/permissions';
 import type {
+  AccountStatus,
   Halaqah,
   HalaqahMember,
   Report,
@@ -51,7 +58,16 @@ interface DailyEntry {
 
 interface StudentRow {
   id: string;
+  /** Display name (first + second) used as the row's primary label. */
   name: string;
+  /** Full three-part name shown in the contact column. */
+  fullName: string;
+  /** Phone — surfaced to authorized viewers as a tap-to-WhatsApp link. */
+  phone: string | null;
+  /** Email — surfaced as a `mailto:` link. */
+  email: string | null;
+  /** Account status — drives the activation toggle button label. */
+  status: AccountStatus | null;
   totalReports: number;
   reports30d: number;
   consistency30: number; // 0..100, distinct days reported / 30
@@ -196,9 +212,20 @@ function buildStudentRow(
     };
   });
 
+  // Contact + status fields for the supervisor view. Pulled from the
+  // joined profile on the member row (members.byHalaqah now selects
+  // `third_name`, `phone`, `email`, `status`). Falls back gracefully
+  // to nulls so older join shapes don't crash the renderer.
+  const studentProfile = member.student;
   return {
     id: member.student_id,
-    name: member.student ? getDisplayName(member.student) : member.student_id,
+    name: studentProfile ? getDisplayName(studentProfile) : member.student_id,
+    fullName: studentProfile
+      ? getFullName(studentProfile) || getDisplayName(studentProfile)
+      : member.student_id,
+    phone: studentProfile?.phone ?? null,
+    email: studentProfile?.email ?? null,
+    status: studentProfile?.status ?? null,
     totalReports: reports.length,
     reports30d,
     consistency30,
@@ -217,12 +244,22 @@ function buildStudentRow(
 export function SupervisorDashboard() {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const toast = useToast();
 
   const [panels, setPanels] = useState<HalaqahPanel[]>([]);
   const [loading, setLoading] = useState(true);
   // Expanded student ids (key = `${halaqahId}:${studentId}` so the same
   // student appearing in two halaqahs expands independently).
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [activationLoadingId, setActivationLoadingId] = useState<string | null>(
+    null,
+  );
+
+  // Permission gates. The dashboard is supervisor-only, but we still
+  // route through the central helpers so a future role change is one
+  // edit. Backend RPC enforces the actual per-student scope (RLS-safe).
+  const canActivate = canManageStudentActivation(profile?.role);
+  const canSeeContact = canContactStudents(profile?.role);
 
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => {
@@ -231,6 +268,37 @@ export function SupervisorDashboard() {
       else next.add(key);
       return next;
     });
+  };
+
+  // Toggle a student's account status. The next status is the inverse
+  // of the row's current status (active ↔ suspended). Locally mutate
+  // the matching row on success so the panel reflects the change
+  // without a full refetch.
+  const handleToggleActivation = async (row: StudentRow) => {
+    const next: AccountStatus = row.status === 'active' ? 'suspended' : 'active';
+    setActivationLoadingId(row.id);
+    try {
+      const { error } = await api.profiles.setStudentStatus(row.id, next);
+      if (error) {
+        toast.error(error.message || t('errors.unauthorized'));
+        return;
+      }
+      setPanels((prev) =>
+        prev.map((p) => ({
+          ...p,
+          students: p.students.map((s) =>
+            s.id === row.id ? { ...s, status: next } : s,
+          ),
+        })),
+      );
+      toast.success(
+        next === 'active'
+          ? t('admin.studentActivated')
+          : t('admin.studentSuspended'),
+      );
+    } finally {
+      setActivationLoadingId(null);
+    }
   };
 
   useEffect(() => {
@@ -246,7 +314,6 @@ export function SupervisorDashboard() {
         if (ids.length === 0) {
           if (!cancelled) {
             setPanels([]);
-            console.log('SUPERVISOR DASHBOARD DATA', { assignments: [], panels: [] });
           }
           return;
         }
@@ -312,7 +379,6 @@ export function SupervisorDashboard() {
 
         const valid = built.filter((p): p is HalaqahPanel => p.halaqah !== null);
         setPanels(valid);
-        console.log('SUPERVISOR DASHBOARD DATA', { assignments, panels: valid });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -434,6 +500,11 @@ export function SupervisorDashboard() {
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
                             {t('supervisor.studentName')}
                           </th>
+                          {canSeeContact && (
+                            <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                              {t('student.contact')}
+                            </th>
+                          )}
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
                             {t('supervisor.consistency30')}
                           </th>
@@ -452,6 +523,11 @@ export function SupervisorDashboard() {
                           <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
                             {t('supervisor.lastActivity')}
                           </th>
+                          {canActivate && (
+                            <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                              {t('student.activation')}
+                            </th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -467,6 +543,10 @@ export function SupervisorDashboard() {
                               onToggle={toggleExpanded}
                               tierLabel={t(tierLabelKey(s.tier))}
                               recencyLabel={formatRecency(s)}
+                              showContact={canSeeContact}
+                              showActivation={canActivate}
+                              activationLoadingId={activationLoadingId}
+                              onToggleActivation={handleToggleActivation}
                               t={t}
                             />
                           );
@@ -582,6 +662,10 @@ function FragmentRow({
   onToggle,
   tierLabel,
   recencyLabel,
+  showContact,
+  showActivation,
+  activationLoadingId,
+  onToggleActivation,
   t,
 }: {
   student: StudentRow;
@@ -590,8 +674,20 @@ function FragmentRow({
   onToggle: (key: string) => void;
   tierLabel: string;
   recencyLabel: string;
+  showContact: boolean;
+  showActivation: boolean;
+  activationLoadingId: string | null;
+  onToggleActivation: (row: StudentRow) => void;
   t: (key: string) => string;
 }) {
+  // Total visible cells in the summary row (used for the expand-row
+  // colSpan). 6 fixed columns + name + optional contact + optional
+  // activation. Keeps the breakdown row spanning the full table width.
+  const summaryColSpan = 6 + (showContact ? 1 : 0) + (showActivation ? 1 : 0);
+  const isActive = student.status === 'active';
+  const activationLoading = activationLoadingId === student.id;
+  const whatsappLink = student.phone ? buildWhatsAppLink(student.phone) : null;
+
   return (
     <>
       <tr
@@ -611,8 +707,41 @@ function FragmentRow({
           </span>
         </td>
         <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">
-          {student.name}
+          {student.fullName || student.name}
         </td>
+        {showContact && (
+          <td
+            className="px-3 py-3 align-top"
+            // Contact links shouldn't trigger row expand/collapse.
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-0.5 items-end max-w-[220px]">
+              {whatsappLink ? (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-primary hover:underline truncate w-full text-right"
+                >
+                  {student.phone}
+                </a>
+              ) : (
+                <span className="text-sm text-muted">
+                  {t('student.noPhone')}
+                </span>
+              )}
+              {student.email && (
+                <a
+                  href={`mailto:${student.email}`}
+                  className="text-xs text-muted hover:text-primary truncate w-full text-right"
+                  title={student.email}
+                >
+                  {student.email}
+                </a>
+              )}
+            </div>
+          </td>
+        )}
         <td className="px-3 py-3">
           <ConsistencyCell
             percent={student.consistency30}
@@ -636,12 +765,28 @@ function FragmentRow({
         <td className="px-3 py-3 text-muted whitespace-nowrap">
           {recencyLabel}
         </td>
+        {showActivation && (
+          <td
+            className="px-3 py-3"
+            // Don't bubble the click to the row's expand handler.
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              size="sm"
+              variant={isActive ? 'destructive' : 'success'}
+              loading={activationLoading}
+              onClick={() => onToggleActivation(student)}
+            >
+              {isActive ? t('admin.suspend') : t('admin.activate')}
+            </Button>
+          </td>
+        )}
       </tr>
 
       {isOpen && (
         <tr className="bg-muted/10">
           <td className="px-3 py-3" />
-          <td className="px-3 py-3" colSpan={7}>
+          <td className="px-3 py-3" colSpan={summaryColSpan}>
             <WeekBreakdown student={student} t={t} />
           </td>
         </tr>

@@ -1,6 +1,21 @@
 import { TOTAL_QURAN_PAGES } from './constants';
 import type { Profile } from '../types';
 
+// Re-export validators from the dedicated module so existing
+// `import { isValidEmail, ... } from '../lib/utils'` call-sites keep
+// compiling. New code should import from `lib/validators` directly.
+export {
+  EMAIL_REGEX,
+  PHONE_REGEX,
+  normalizeArabicDigits,
+  isValidEmail,
+  isValidPhone,
+  formatPhone,
+  validatePassword,
+  validatePages,
+} from './validators';
+export type { ValidationResult } from './validators';
+
 /**
  * Combines class names, filtering out falsy values
  */
@@ -39,12 +54,41 @@ export function formatArabicDate(date: string | Date | null | undefined): string
 }
 
 /**
- * Formats a date as YYYY-MM-DD
+ * Formats a Date instance as YYYY-MM-DD using the LOCAL timezone.
+ *
+ * `toISOString()` is intentionally NOT used here — it serializes to UTC,
+ * so a Date constructed at 11pm in Riyadh (UTC+3) would round-trip as
+ * "tomorrow" when sliced as a date-only string. For date-only fields
+ * (`reports.report_date`, `<input type="date">` values) we must read
+ * local components so the surfaced day matches the user's calendar day.
+ *
+ * Anything date-only that is server-stored as a string ("2025-05-09")
+ * MUST go through this helper. Datetimes that are stored as UTC
+ * timestamps (`created_at` etc.) keep using ISO/UTC.
  */
 export function formatDateISO(date: Date | null | undefined): string {
   if (!date) return '';
   const d = new Date(date);
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Today's date as a YYYY-MM-DD string in the user's LOCAL timezone.
+ *
+ * The single canonical entry-point for "what is today" anywhere a
+ * date-only field is involved (report defaults, input max attributes,
+ * day-bucket comparisons). Constructing dates inline with
+ * `new Date()` and then offsetting / `toISOString()`-ing is the bug
+ * source we're closing — past attempts at fixing the off-by-one used
+ * `setDate(getDate() + 1)` to mask a UTC shift in `formatDateISO`,
+ * which then started rendering as TOMORROW once `formatDateISO` was
+ * corrected. Funnel everything through this helper instead.
+ */
+export function getTodayLocalDate(): string {
+  return formatDateISO(new Date());
 }
 
 /**
@@ -66,64 +110,62 @@ export function getDisplayName(profile: Partial<Profile> | null | undefined): st
 }
 
 /**
- * Validates email format
+ * Builds a `https://wa.me/<digits>` URL.
+ *
+ * Strips a leading `+`, spaces, dashes, and parentheses. Returns null
+ * for empty / invalid input so callers can hide the button when there
+ * is no number to call.
+ *
+ * Optional `text` is URL-encoded and appended as ?text=.
  */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+export function buildWhatsAppLink(
+  phone: string | null | undefined,
+  text?: string,
+): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/[^\d]/g, '');
+  if (digits.length < 6) return null;
+  const base = `https://wa.me/${digits}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
 /**
- * Validates phone number format (international format with country code)
- * Accepts formats like: +966501234567, +201234567890, +1234567890
+ * Builds a `https://t.me/<username>?text=<encoded>` URL.
+ *
+ * Tolerated admin input shapes (the academy settings field is a single
+ * text input, so we have to defensively normalize whatever an admin
+ * pastes in):
+ *
+ *   - "@wahdaynak_support"
+ *   - "wahdaynak_support"
+ *   - "t.me/wahdaynak_support"
+ *   - "https://t.me/wahdaynak_support"
+ *   - "https://telegram.me/wahdaynak_support"
+ *   - leading/trailing whitespace, trailing slashes
+ *
+ * Anything else collapses to `null` so the FeedbackModal can surface a
+ * "channel not configured" error instead of opening a broken URL.
  */
-export function isValidPhone(phone: string): boolean {
-  // Remove spaces and dashes
-  const cleaned = phone.replace(/[\s\-()]/g, '');
-  // Must start with + followed by country code (1-3 digits) and phone number (7-12 digits)
-  const phoneRegex = /^\+\d{1,3}\d{7,12}$/;
-  return phoneRegex.test(cleaned);
-}
-
-/**
- * Formats phone number to standard format
- */
-export function formatPhone(phone: string): string {
-  if (!phone) return '';
-  // Remove spaces and dashes
-  const cleaned = phone.replace(/[\s\-()]/g, '');
-  // If already has +, return as is
-  if (cleaned.startsWith('+')) return cleaned;
-  // If starts with country code without +, add +
-  if (/^\d{1,3}\d{7,12}$/.test(cleaned)) return '+' + cleaned;
-  return cleaned;
-}
-
-/**
- * Validates password strength
- */
-export function validatePassword(password: string): { isValid: boolean; message: string } {
-  if (!password) {
-    return { isValid: false, message: 'كلمة المرور مطلوبة' };
-  }
-  if (password.length < 8) {
-    return { isValid: false, message: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' };
-  }
-  return { isValid: true, message: '' };
-}
-
-/**
- * Validates page count for reports
- */
-export function validatePages(pages: string | number): { isValid: boolean; message: string } {
-  const num = parseFloat(String(pages));
-  if (isNaN(num) || num < 0.25) {
-    return { isValid: false, message: 'الحد الأدنى: ربع صفحة (0.25)' };
-  }
-  if (num > TOTAL_QURAN_PAGES) {
-    return { isValid: false, message: `الحد الأقصى: ${TOTAL_QURAN_PAGES} صفحة` };
-  }
-  return { isValid: true, message: '' };
+export function buildTelegramLink(
+  username: string | null | undefined,
+  text?: string,
+): string | null {
+  if (!username) return null;
+  let clean = username.trim();
+  if (!clean) return null;
+  // Strip the protocol + host if a full URL was pasted in — leaves
+  // just the path segment.
+  clean = clean.replace(/^https?:\/\//i, '');
+  clean = clean.replace(/^(t\.me|telegram\.me)\//i, '');
+  // Strip any leading @ and trailing slashes/whitespace.
+  clean = clean.replace(/^@+/, '').replace(/\/+$/, '').trim();
+  if (!clean) return null;
+  // Telegram usernames are alphanumeric + underscore. If anything else
+  // remains (spaces, special chars), treat the value as malformed and
+  // refuse rather than open a broken chat.
+  if (!/^[A-Za-z0-9_]+$/.test(clean)) return null;
+  const base = `https://t.me/${clean}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
 /**

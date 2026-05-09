@@ -1,5 +1,5 @@
 /**
- * settings api — read + write `public.settings` (single row, id=1).
+ * settings api — read + write `public.settings` (single row).
  *
  * Column contract (canonical, matches production):
  *   - academy_name_ar
@@ -10,6 +10,12 @@
  *   - instagram_url
  *   - whatsapp_number
  *   - email
+ *   - complaints_telegram_username   ← Telegram destination for the
+ *                                      in-app complaints/suggestions
+ *                                      modal. Required for that flow
+ *                                      to send anything; the modal
+ *                                      surfaces a "not configured"
+ *                                      error when this is empty.
  *
  * Legacy `contact_*` column names have been retired — this module never
  * reads or writes them. Any field that comes back null is normalized to
@@ -33,6 +39,13 @@ export interface SettingsMap {
   academy_name_en?: string;
   academy_description_ar?: string;
   academy_description_en?: string;
+  /**
+   * Telegram username (e.g. `@wahdaynak_support`) — the destination
+   * for the in-app complaints/suggestions flow. Telegram-only by
+   * product spec; when empty the FeedbackModal refuses to send and
+   * surfaces a "channel not configured" error to the user.
+   */
+  complaints_telegram_username?: string;
 }
 
 const KNOWN_KEYS: ReadonlyArray<keyof SettingsMap> = [
@@ -44,6 +57,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof SettingsMap> = [
   'academy_name_en',
   'academy_description_ar',
   'academy_description_en',
+  'complaints_telegram_username',
 ];
 
 type AnyRow = Record<string, unknown>;
@@ -167,8 +181,35 @@ async function update(
   return { error };
 }
 
+/**
+ * Convenience reader for the FeedbackModal — returns the configured
+ * Telegram username for the complaints/suggestions flow.
+ *
+ * Telegram-only by product spec. The shape is wrapped in `{ data, error }`
+ * to keep call-site ergonomics consistent with the rest of `api/*` and
+ * to leave room for adding channels later without breaking callers.
+ */
+async function getComplaintsTargets(): Promise<{
+  data: { telegram: string | null };
+  error: Error | null;
+}> {
+  try {
+    const map = await load();
+    return {
+      data: { telegram: map.complaints_telegram_username || null },
+      error: null,
+    };
+  } catch (err) {
+    return {
+      data: { telegram: null },
+      error: err as Error,
+    };
+  }
+}
+
 export const settingsApi = {
   load,
   update,
+  getComplaintsTargets,
   KNOWN_KEYS,
 };

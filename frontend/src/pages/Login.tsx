@@ -12,6 +12,7 @@ import { Button } from "../components/atoms/Button";
 import { isValidEmail } from "../lib/utils";
 import { getErrorMessage } from "../lib/errorHandler";
 import { ROUTES } from "../lib/routes";
+import { SOCIAL_LINKS } from "../lib/constants";
 
 // ============================================
 // Types
@@ -156,6 +157,34 @@ export function Login() {
           </div>
         </form>
       </AuthCard>
+
+      {/* Public social links — config-driven via SOCIAL_LINKS so URLs
+          live in env vars and can be swapped per-deploy. Links only
+          render when the env var is set. */}
+      {(SOCIAL_LINKS.youtube || SOCIAL_LINKS.telegram) && (
+        <div className="mt-6 flex justify-center gap-4 text-sm">
+          {SOCIAL_LINKS.youtube && (
+            <a
+              href={SOCIAL_LINKS.youtube}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted hover:text-primary"
+            >
+              {t("social.youtube")}
+            </a>
+          )}
+          {SOCIAL_LINKS.telegram && (
+            <a
+              href={SOCIAL_LINKS.telegram}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted hover:text-primary"
+            >
+              {t("social.telegram")}
+            </a>
+          )}
+        </div>
+      )}
     </AuthLayout>
   );
 }

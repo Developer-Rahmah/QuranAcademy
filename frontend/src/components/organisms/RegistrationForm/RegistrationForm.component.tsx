@@ -115,7 +115,7 @@ export function StudentRegistrationForm() {
 
     const passwordValidation = validatePassword(formData.password);
     if (!passwordValidation.isValid) {
-      newErrors.password = passwordValidation.message;
+      newErrors.password = t(passwordValidation.messageKey);
     }
 
     if (!formData.recitation.trim()) {
@@ -462,7 +462,7 @@ export function TeacherRegistrationForm() {
 
     const passwordValidation = validatePassword(formData.password);
     if (!passwordValidation.isValid) {
-      newErrors.password = passwordValidation.message;
+      newErrors.password = t(passwordValidation.messageKey);
     }
 
     if (!formData.teaching_experience.trim()) {

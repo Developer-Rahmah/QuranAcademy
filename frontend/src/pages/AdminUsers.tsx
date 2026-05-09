@@ -23,6 +23,7 @@ import {
   canDeleteUsers,
   canAssignRole as permsCanAssignRole,
   isAdminOrSupervisorManager,
+  canManageUserStatus,
 } from '../lib/permissions';
 import type { Profile, UserRole, AccountStatus, UserSegment } from '../types';
 
@@ -76,6 +77,10 @@ export function AdminUsers() {
   // grant `admin` (supervisor_manager cannot escalate to admin).
   const { profile: currentUser } = useAuth();
   const viewerRole = currentUser?.role;
+  // Belt-and-braces: the route is already admin-only, but the action
+  // helpers re-check viewer role so a future role addition (or a
+  // mistakenly widened route guard) can't activate users via UI.
+  const allowedToManageStatus = canManageUserStatus(viewerRole);
 
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +177,13 @@ export function AdminUsers() {
   // Update User Status
   // ============================================
   const updateUserStatus = async (userId: string, newStatus: AccountStatus) => {
+    if (!allowedToManageStatus) {
+      // Hard-fail: no role outside admin/supervisor_manager should
+      // ever reach this code path, but if they do (e.g. dev tools
+      // calling the function directly), refuse rather than mutate.
+      toast.error(t('errors.unauthorized'));
+      return;
+    }
     setActionLoading(userId);
     try {
       const { error } = await db.profiles.update(userId, { status: newStatus });
@@ -450,7 +462,7 @@ export function AdminUsers() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className={styles.actionsCell}>
-                        {user.status === 'pending' && (
+                        {allowedToManageStatus && user.status === 'pending' && (
                           <Button
                             size="sm"
                             variant="success"
@@ -461,7 +473,7 @@ export function AdminUsers() {
                             {t('admin.activate')}
                           </Button>
                         )}
-                        {user.status === 'active' && (
+                        {allowedToManageStatus && user.status === 'active' && (
                           <Button
                             size="sm"
                             variant="destructive"
@@ -471,7 +483,7 @@ export function AdminUsers() {
                             {t('admin.suspend')}
                           </Button>
                         )}
-                        {user.status === 'suspended' && (
+                        {allowedToManageStatus && user.status === 'suspended' && (
                           <Button
                             size="sm"
                             variant="success"
