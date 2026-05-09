@@ -75,7 +75,7 @@ export function AdminUsers() {
   // Current viewer's role drives what role-change targets they're allowed
   // to assign. Only admin can grant `supervisor_manager`; only admin can
   // grant `admin` (supervisor_manager cannot escalate to admin).
-  const { profile: currentUser } = useAuth();
+  const { profile: currentUser, refreshProfile } = useAuth();
   const viewerRole = currentUser?.role;
   // Belt-and-braces: the route is already admin-only, but the action
   // helpers re-check viewer role so a future role addition (or a
@@ -196,6 +196,12 @@ export function AdminUsers() {
 
       toast.success(t('admin.userUpdated'));
       await fetchUsers();
+      // Self-suspend by an admin/supervisor_manager: refresh own profile
+      // so the centralized active-status guard signs them out
+      // immediately instead of waiting for the next visibility change.
+      if (userId === currentUser?.id && newStatus !== 'active') {
+        await refreshProfile();
+      }
     } catch (err) {
       console.error('Error updating user:', err);
       toast.error(t('errors.generic'));

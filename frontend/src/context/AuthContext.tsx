@@ -19,6 +19,8 @@ import {
 } from "react";
 import { supabase } from "../lib/supabase/client";
 import { api } from "../lib/supabase";
+import { useToast } from "./ToastContext";
+import { useTranslation } from "../locales/i18n";
 import type { Profile, UserRole, AuthContextType, User } from "../types";
 import type { Session, AuthError } from "@supabase/supabase-js";
 
@@ -673,18 +675,73 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [user, fetchProfile]);
 
   // ============================================
+  // Active-status guard
+  //
+  // Single source of truth for "if profile.status is no longer active,
+  // immediately invalidate the session". Lives here (not in RoleGuard)
+  // so it covers every protected surface — route guards, hidden mounts,
+  // background profile refreshes — without each consumer reimplementing
+  // the same dance.
+  //
+  // Loop-avoidance design:
+  //   - the effect bails on `!profile` (post-signOut path).
+  //   - a ref tracks whether we've already fired the toast/signOut for
+  //     this profile so a subsequent re-render with the same suspended
+  //     profile (e.g. translation context updates) doesn't double-toast.
+  //   - the ref resets when profile becomes null OR active again, so a
+  //     future suspension (e.g. session-A active → suspended) is still
+  //     handled exactly once.
+  // ============================================
+  const { warning: toastWarning } = useToast();
+  const { t } = useTranslation();
+  const inactiveHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (!profile) {
+      inactiveHandledRef.current = false;
+      return;
+    }
+    if (profile.status === "active") {
+      inactiveHandledRef.current = false;
+      return;
+    }
+    if (inactiveHandledRef.current) return;
+
+    inactiveHandledRef.current = true;
+    logger.info("Profile no longer active — signing out", {
+      userId: profile.id,
+      status: profile.status,
+    });
+    toastWarning(t("auth.accountInactive"));
+    void signOut();
+  }, [profile, toastWarning, t, signOut]);
+
+  // ============================================
+  // Visibility refresh
+  //
+  // When the user comes back to the tab (or unminimizes the browser),
+  // pull a fresh profile so a status flip that happened while the tab
+  // was hidden propagates immediately. Lightweight: one fetch per
+  // visibility transition, never on a timer / never per render — so we
+  // don't spam Supabase.
+  // ============================================
+  useEffect(() => {
+    if (!user) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshProfile();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [user, refreshProfile]);
+
+  // ============================================
   // Role Utilities
   // ============================================
   const hasRole = useCallback(
-    (role: UserRole) => {
-      const result = profile?.role === role;
-      logger.debug("hasRole check", {
-        checkingRole: role,
-        profileRole: profile?.role,
-        result,
-      });
-      return result;
-    },
+    (role: UserRole) => profile?.role === role,
     [profile],
   );
   const isAdmin = useCallback(() => hasRole("admin"), [hasRole]);

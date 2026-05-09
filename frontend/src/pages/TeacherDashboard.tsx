@@ -23,7 +23,7 @@ import type { AccountStatus, StudentWithProgress } from "../types";
  */
 export function TeacherDashboard() {
   const { t } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const toast = useToast();
   const { halaqahs, loading: loadingHalaqahs } = useHalaqahs({
     teacherId: profile?.id,
@@ -65,6 +65,13 @@ export function TeacherDashboard() {
           : t("admin.studentSuspended"),
       );
       refetch?.();
+      // Self-suspend: pull a fresh profile so the centralized
+      // active-status guard in AuthProvider fires immediately. (A
+      // teacher suspending themselves is unusual — but possible if an
+      // admin promoted the user mid-session — so we cover the edge.)
+      if (student.id === profile?.id && next !== "active") {
+        await refreshProfile();
+      }
     } finally {
       setActivationLoadingId(null);
     }

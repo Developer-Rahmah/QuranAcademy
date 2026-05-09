@@ -40,7 +40,7 @@ interface HalaqahStats {
 export function HalaqahDetails() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const toast = useToast();
 
   // Auth-vs-profile id integrity check. The supervisor APIs use
@@ -87,6 +87,13 @@ export function HalaqahDetails() {
       // Re-pull members so the row's new status reflects in the UI
       // without us having to mirror it locally.
       refetch?.();
+      // Self-suspend: refresh own profile so AuthProvider's
+      // active-status guard fires immediately and signs the suspending
+      // user out. Without this they'd retain a stale 'active' profile
+      // until the next visibility change.
+      if (student.id === profile?.id && next !== 'active') {
+        await refreshProfile();
+      }
     } finally {
       setActivationLoadingId(null);
     }
@@ -373,7 +380,9 @@ export function HalaqahDetails() {
             loading={loadingStudents}
             showReportsButton={false}
             segment={halaqah?.segment}
-            showContact={canContactStudents(profile?.role)}
+            showContact={canContactStudents(profile?.role, {
+              isSupervisor: isSupervisorOfThisHalaqah,
+            })}
             showActivation={canActivate}
             activationLoadingId={activationLoadingId}
             onToggleActivation={handleToggleActivation}

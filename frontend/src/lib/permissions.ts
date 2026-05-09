@@ -129,8 +129,20 @@ export function canManageSettings(role: RoleInput): boolean {
  * Contact students directly (WhatsApp / phone). Granted to anyone
  * responsible for halaqah oversight: admin, supervisor_manager,
  * teachers, and halaqah supervisors.
+ *
+ * Same dual-role caveat as `canManageStudentActivation`: a relational
+ * supervisor often has `profile.role = 'student'` plus a row in
+ * `halaqah_supervisors`. Role-only checks would hide contact info from
+ * those users on SupervisorDashboard / HalaqahDetails. Pass
+ * `opts.isSupervisor: true` when the caller has independent evidence
+ * (presence on a supervisor-only surface, an assignment row for the
+ * current halaqah, etc).
  */
-export function canContactStudents(role: RoleInput): boolean {
+export function canContactStudents(
+  role: RoleInput,
+  opts: { isSupervisor?: boolean } = {},
+): boolean {
+  if (opts.isSupervisor) return true;
   return (
     role === 'admin' ||
     role === 'supervisor_manager' ||
