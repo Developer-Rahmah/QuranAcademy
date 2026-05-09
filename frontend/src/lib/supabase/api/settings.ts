@@ -10,12 +10,16 @@
  *   - instagram_url
  *   - whatsapp_number
  *   - email
- *   - complaints_telegram_username   ← Telegram destination for the
- *                                      in-app complaints/suggestions
- *                                      modal. Required for that flow
- *                                      to send anything; the modal
- *                                      surfaces a "not configured"
- *                                      error when this is empty.
+ *   - complaints_telegram_username   ← Legacy field. The in-app
+ *                                      complaints/suggestions flow
+ *                                      now POSTs to the dedicated
+ *                                      backend service (see
+ *                                      `backend/complaints-api/`),
+ *                                      which holds its own bot token
+ *                                      + admin chat ids. This column
+ *                                      is still surfaced in the admin
+ *                                      settings form for reference /
+ *                                      future use.
  *
  * Legacy `contact_*` column names have been retired — this module never
  * reads or writes them. Any field that comes back null is normalized to
@@ -40,10 +44,10 @@ export interface SettingsMap {
   academy_description_ar?: string;
   academy_description_en?: string;
   /**
-   * Telegram username (e.g. `@wahdaynak_support`) — the destination
-   * for the in-app complaints/suggestions flow. Telegram-only by
-   * product spec; when empty the FeedbackModal refuses to send and
-   * surfaces a "channel not configured" error to the user.
+   * Telegram username (e.g. `@wahdaynak_support`). Legacy — the
+   * in-app complaints flow now uses the dedicated backend service,
+   * not this field. Kept on the type for backward compatibility with
+   * existing rows and the admin settings form.
    */
   complaints_telegram_username?: string;
 }
@@ -181,35 +185,8 @@ async function update(
   return { error };
 }
 
-/**
- * Convenience reader for the FeedbackModal — returns the configured
- * Telegram username for the complaints/suggestions flow.
- *
- * Telegram-only by product spec. The shape is wrapped in `{ data, error }`
- * to keep call-site ergonomics consistent with the rest of `api/*` and
- * to leave room for adding channels later without breaking callers.
- */
-async function getComplaintsTargets(): Promise<{
-  data: { telegram: string | null };
-  error: Error | null;
-}> {
-  try {
-    const map = await load();
-    return {
-      data: { telegram: map.complaints_telegram_username || null },
-      error: null,
-    };
-  } catch (err) {
-    return {
-      data: { telegram: null },
-      error: err as Error,
-    };
-  }
-}
-
 export const settingsApi = {
   load,
   update,
-  getComplaintsTargets,
   KNOWN_KEYS,
 };

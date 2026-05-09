@@ -130,45 +130,6 @@ export function buildWhatsAppLink(
 }
 
 /**
- * Builds a `https://t.me/<username>?text=<encoded>` URL.
- *
- * Tolerated admin input shapes (the academy settings field is a single
- * text input, so we have to defensively normalize whatever an admin
- * pastes in):
- *
- *   - "@wahdaynak_support"
- *   - "wahdaynak_support"
- *   - "t.me/wahdaynak_support"
- *   - "https://t.me/wahdaynak_support"
- *   - "https://telegram.me/wahdaynak_support"
- *   - leading/trailing whitespace, trailing slashes
- *
- * Anything else collapses to `null` so the FeedbackModal can surface a
- * "channel not configured" error instead of opening a broken URL.
- */
-export function buildTelegramLink(
-  username: string | null | undefined,
-  text?: string,
-): string | null {
-  if (!username) return null;
-  let clean = username.trim();
-  if (!clean) return null;
-  // Strip the protocol + host if a full URL was pasted in — leaves
-  // just the path segment.
-  clean = clean.replace(/^https?:\/\//i, '');
-  clean = clean.replace(/^(t\.me|telegram\.me)\//i, '');
-  // Strip any leading @ and trailing slashes/whitespace.
-  clean = clean.replace(/^@+/, '').replace(/\/+$/, '').trim();
-  if (!clean) return null;
-  // Telegram usernames are alphanumeric + underscore. If anything else
-  // remains (spaces, special chars), treat the value as malformed and
-  // refuse rather than open a broken chat.
-  if (!/^[A-Za-z0-9_]+$/.test(clean)) return null;
-  const base = `https://t.me/${clean}`;
-  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
-}
-
-/**
  * Debounce function
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
