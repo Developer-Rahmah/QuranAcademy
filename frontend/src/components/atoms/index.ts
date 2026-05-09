@@ -67,3 +67,8 @@ export type { LogoSize } from './Logo';
 
 // LanguageSwitcher
 export { LanguageSwitcher } from './LanguageSwitcher';
+
+// Canonical — global `<link rel="canonical">` manager. Mount once
+// inside <BrowserRouter>; it reads the current pathname and keeps the
+// head tag in sync. Renders nothing.
+export { Canonical, buildCanonicalUrl } from './Canonical';

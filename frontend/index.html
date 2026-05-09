@@ -8,6 +8,15 @@
       name="description"
       content="أكاديمية وهديناك لخدمات القرآن الكريم وعلومه — رحلة لتدبر آيات الله"
     />
+    <!--
+      Default canonical — points to the homepage on the production
+      domain. The <Canonical /> React component (mounted inside
+      BrowserRouter) takes ownership at runtime and rewrites this
+      tag's `href` on every route change, so deeper pages still get
+      their correct canonical. This static fallback exists so the
+      initial server response and JS-less crawlers see a valid one.
+    -->
+    <link rel="canonical" href="https://www.wahdaynakacademy.com/" />
     <title>أكاديمية وهديناك — Wahdaynak Academy</title>
   </head>
   <body class="bg-background">
