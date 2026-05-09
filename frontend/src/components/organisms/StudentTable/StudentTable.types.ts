@@ -22,9 +22,11 @@ export interface StudentTableProps {
   /**
    * When true, renders an Activate / Deactivate button per student
    * row. Visibility is driven by
-   * `permissions.canManageStudentActivation(viewerRole)` at the call
-   * site. The actual scope check (which halaqahs the viewer manages)
-   * runs server-side in the `set_student_status` RPC — this prop only
+   * `permissions.canManageStudentActivation(viewerRole, opts)` at the
+   * call site — pass `opts.isSupervisor: true` for relational
+   * supervisors (profile.role often = 'student', but a row exists in
+   * `halaqah_supervisors`). The actual per-student scope check runs
+   * server-side in the `set_student_status` RPC — this prop only
    * controls UI affordance.
    */
   showActivation?: boolean;

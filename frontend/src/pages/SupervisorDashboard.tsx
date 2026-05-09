@@ -255,10 +255,19 @@ export function SupervisorDashboard() {
     null,
   );
 
-  // Permission gates. The dashboard is supervisor-only, but we still
-  // route through the central helpers so a future role change is one
-  // edit. Backend RPC enforces the actual per-student scope (RLS-safe).
-  const canActivate = canManageStudentActivation(profile?.role);
+  // Permission gates.
+  //
+  // Reaching SupervisorDashboard *implies* the user is a relational
+  // halaqah_supervisor — the dispatcher (App.tsx) routes here only when
+  // `isUserSupervisor(assignments)` is true and the user picked the
+  // supervisor view. Many production supervisors have `profile.role =
+  // 'student'` (dual-role pattern), so a role-only check would hide the
+  // activation column from them. Pass `isSupervisor: true` so the
+  // helper accepts the relational case alongside the role-based case.
+  // Server-side RPC still enforces the per-student scope.
+  const canActivate = canManageStudentActivation(profile?.role, {
+    isSupervisor: true,
+  });
   const canSeeContact = canContactStudents(profile?.role);
 
   const toggleExpanded = (key: string) => {

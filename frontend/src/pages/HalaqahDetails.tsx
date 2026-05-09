@@ -60,11 +60,6 @@ export function HalaqahDetails() {
   // halaqah supervisors). Other roles never see the management UI.
   const canManage = canManageHalaqah(profile?.role);
   const canManageSupervisorList = canManageSupervisors(profile?.role);
-  // Activation toggle: admin / supervisor_manager / teacher /
-  // halaqah_supervisor. Backend RPC enforces the per-student scope so
-  // showing the button to a teacher doesn't grant access to students
-  // outside their halaqahs — RLS / RPC will refuse.
-  const canActivate = canManageStudentActivation(profile?.role);
   const { halaqah, members, loading: loadingHalaqah, refetch } = useHalaqah(id);
 
   const [students, setStudents] = useState<StudentWithProgress[]>([]);
@@ -124,6 +119,22 @@ export function HalaqahDetails() {
 
   // O(1) lookup: is this user already a supervisor of this halaqah?
   const supervisorIds = new Set(supervisors.map((s) => s.user_id));
+
+  // Activation toggle gate.
+  //
+  // Visible to admin / supervisor_manager / teacher / halaqah_supervisor.
+  // The role check covers single-role accounts; the relational
+  // `isSupervisor` flag covers the dual-role case (profile.role =
+  // 'student' + a row in halaqah_supervisors for THIS halaqah). Without
+  // the relational signal, dual-role supervisors land on this page with
+  // no activation buttons even though the backend RPC would accept the
+  // mutation. Backend RPC re-checks per-student scope so the UI doesn't
+  // need to be more conservative than this.
+  const isSupervisorOfThisHalaqah =
+    !!profile?.id && supervisorIds.has(profile.id);
+  const canActivate = canManageStudentActivation(profile?.role, {
+    isSupervisor: isSupervisorOfThisHalaqah,
+  });
 
   // Membership lookup: only students currently in this halaqah are
   // eligible for supervisor assignment (per spec).
