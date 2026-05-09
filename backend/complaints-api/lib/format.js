@@ -10,50 +10,56 @@
  *      deeplink as the WhatsApp fallback. URL-encoding is the caller's
  *      job (`encodeURIComponent`) — we just produce the raw text.
  *
- * Keeping both formatters here means the on-screen presentation stays
- * identical between channels.
+ * Both outputs are rendered in Arabic — the academy is Arabic-first
+ * and the recipient is the Arabic-speaking admin team. The message
+ * type is also localised so the labels read naturally to the admin.
  */
 
-const TYPE_LABELS = {
-  complaint: 'Complaint',
-  suggestion: 'Suggestion',
-  bug: 'Bug',
+// Arabic labels for the three accepted `type` values. The frontend
+// already exposes the same labels under `feedback.type*` keys; we
+// duplicate them here (rather than importing) because this is a
+// standalone Node service with no link to the Vite locales.
+const TYPE_LABELS_AR = {
+  complaint: 'شكوى',
+  suggestion: 'اقتراح',
+  bug: 'خطأ تقني',
 };
 
 function labelFor(type) {
-  return TYPE_LABELS[type] ?? type;
+  return TYPE_LABELS_AR[type] ?? type;
 }
 
 /**
- * Build the message that goes to Telegram admins.
+ * Build the message that goes to Telegram admins (Arabic).
  *
- * Format (matches the spec, plain text — no parse_mode):
+ * Format (plain text — no parse_mode):
  *
- *   📩 New Message - Wahdaynak Academy
+ *   📩 رسالة جديدة - أكاديمية وهديناك
  *
- *   👤 Name: <name>
- *   📝 Type: <type>
- *   💬 Message: <message>
+ *   👤 الاسم: <name>
+ *   📝 النوع: <type>
+ *   💬 الرسالة: <message>
  */
 export function formatTelegramMessage({ name, message, type }) {
   return [
-    '📩 New Message - Wahdaynak Academy',
+    '📩 رسالة جديدة - أكاديمية وهديناك',
     '',
-    `👤 Name: ${name}`,
-    `📝 Type: ${labelFor(type)}`,
-    `💬 Message: ${message}`,
+    `👤 الاسم: ${name}`,
+    `📝 النوع: ${labelFor(type)}`,
+    `💬 الرسالة: ${message}`,
   ].join('\n');
 }
 
 /**
- * Build the WhatsApp fallback text. The frontend will append this to a
- * `https://wa.me/<digits>?text=<encoded>` URL or copy it to clipboard.
+ * Build the WhatsApp fallback text (Arabic). The frontend will append
+ * this to a `https://wa.me/<digits>?text=<encoded>` URL or copy it to
+ * clipboard.
  */
 export function formatWhatsAppText({ name, message, type }) {
   return [
-    'New Message - Wahdaynak Academy',
-    `Name: ${name}`,
-    `Type: ${labelFor(type)}`,
-    `Message: ${message}`,
+    'رسالة جديدة - أكاديمية وهديناك',
+    `الاسم: ${name}`,
+    `النوع: ${labelFor(type)}`,
+    `الرسالة: ${message}`,
   ].join('\n');
 }

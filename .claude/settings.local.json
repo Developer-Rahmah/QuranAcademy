@@ -21,7 +21,12 @@
       "Bash(sips -s format png -z 48 48 wahdaynakacademylogo.png --out favicon-48x48.png)",
       "Bash(sips -s format png -z 180 180 wahdaynakacademylogo.png --out apple-touch-icon.png)",
       "Bash(node scripts/generate-favicon-ico.mjs)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(VITE_COMPLAINTS_API_URL=https://complaints-test.example.com npm run build)",
+      "Bash(VITE_COMPLAINTS_API_URL=https://x.example.com npm run build)",
+      "Bash(curl -s -i -m 8 https://wahdaynak-complaints-api.vercel.app/healthz)",
+      "Bash(curl -s -i -m 8 -X OPTIONS https://wahdaynak-complaints-api.vercel.app/api/complaint -H 'Origin: https://www.wahdaynakacademy.com' -H 'Access-Control-Request-Method: POST')",
+      "Bash(git checkout *)"
     ]
   }
 }
