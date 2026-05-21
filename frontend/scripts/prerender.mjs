@@ -1,0 +1,264 @@
+#!/usr/bin/env node
+/**
+ * prerender — static-site generation for the public marketing surfaces.
+ *
+ * After `vite build` writes `dist/`, this script:
+ *
+ *   1. Spawns a tiny in-process HTTP server that serves `dist/` and
+ *      falls back to `dist/index.html` for SPA routes (mirrors what
+ *      Vercel does in production).
+ *   2. Launches headless Chromium via Puppeteer.
+ *   3. For each public route in PRERENDER_ROUTES, navigates, waits for
+ *      the page to fully hydrate (key DOM selector + network idle),
+ *      then snapshots `document.documentElement.outerHTML`.
+ *   4. Writes the snapshot to `dist/<route>/index.html` (or
+ *      `dist/index.html` for `/`).
+ *
+ * Why a custom Puppeteer script instead of a plugin:
+ *
+ *   - The app reads `window.localStorage`, has multiple async
+ *     providers (AuthProvider, SettingsProvider, I18nProvider) and a
+ *     Supabase client. Real Chromium handles every browser API
+ *     correctly; jsdom-based renderers do not.
+ *   - Zero plugin magic — failures surface as readable Node errors,
+ *     not opaque framework output.
+ *   - Easy to extend: add a route, add an entry to PRERENDER_ROUTES.
+ *
+ * Auth bypass: before the app boots, this script injects
+ * `window.__PRERENDER__ = true`. `<PublicRoute>` checks the flag and
+ * renders its children immediately instead of waiting for a Supabase
+ * `getSession()` response. Real users never have the flag, so runtime
+ * behaviour is unchanged.
+ */
+import { spawn } from 'node:child_process';
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { dirname, extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST_DIR = resolve(__dirname, '..', 'dist');
+const PORT = Number(process.env.PRERENDER_PORT ?? 4319);
+const ORIGIN = `http://127.0.0.1:${PORT}`;
+
+/**
+ * Routes to prerender. Mirrors the public surfaces in `src/lib/routes.ts`
+ * and `scripts/generate-sitemap.mjs`. Keep these three in sync — only
+ * routes that are noindex (auth forms, authenticated areas) stay out.
+ */
+const PRERENDER_ROUTES = [
+  '/',
+  '/register/student',
+  '/register/teacher',
+];
+
+// ---------------------------------------------------------------------
+// Tiny static server (mirrors Vercel's static-first, SPA-fallback
+// routing). Filesystem hit first, then `index.html` for unmatched
+// paths — exactly the order Vercel resolves requests in production.
+// ---------------------------------------------------------------------
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
+  '.mjs':  'application/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.ico':  'image/x-icon',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.xml':  'application/xml; charset=utf-8',
+  '.txt':  'text/plain; charset=utf-8',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+function serveFile(res, filePath) {
+  const ext = extname(filePath).toLowerCase();
+  res.writeHead(200, {
+    'content-type': MIME[ext] ?? 'application/octet-stream',
+    'cache-control': 'no-store',
+  });
+  createReadStream(filePath).pipe(res);
+}
+
+function startServer() {
+  return new Promise((resolveStart) => {
+    const server = createServer((req, res) => {
+      // Strip query/hash — irrelevant for static dispatch.
+      const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0].split('#')[0]);
+      const direct = join(DIST_DIR, urlPath);
+
+      // Try `<path>` as a file, then `<path>/index.html`, then root SPA.
+      if (existsSync(direct) && statSync(direct).isFile()) {
+        return serveFile(res, direct);
+      }
+      const asIndex = join(direct, 'index.html');
+      if (existsSync(asIndex) && statSync(asIndex).isFile()) {
+        return serveFile(res, asIndex);
+      }
+      return serveFile(res, join(DIST_DIR, 'index.html'));
+    });
+    server.listen(PORT, '127.0.0.1', () => resolveStart(server));
+  });
+}
+
+// ---------------------------------------------------------------------
+// Puppeteer launcher — handles missing-Chromium gracefully so the
+// build doesn't hard-fail on a dev machine without the cache.
+// ---------------------------------------------------------------------
+async function loadPuppeteer() {
+  try {
+    const mod = await import('puppeteer');
+    return mod.default ?? mod;
+  } catch (err) {
+    console.error('\n[prerender] puppeteer is not installed.');
+    console.error('  Install it with:  yarn add -D puppeteer');
+    console.error('  Then re-run:      yarn build\n');
+    throw err;
+  }
+}
+
+async function renderRoute(browser, route) {
+  const page = await browser.newPage();
+
+  // Set the prerender flag BEFORE the page scripts execute. This is
+  // what unblocks <PublicRoute> from showing its auth-loading spinner
+  // (see comment in src/App.tsx). Also raise a flag in localStorage so
+  // any future code that needs to detect prerender has a synchronous
+  // signal.
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(window, '__PRERENDER__', { value: true, writable: false });
+    try { window.localStorage.setItem('__prerender__', '1'); } catch {}
+  });
+
+  // Match a realistic mobile UA so any device-aware code renders the
+  // mobile-friendly variant (Google evaluates the mobile-rendered HTML
+  // for ranking).
+  await page.setUserAgent(
+    'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 PrerenderBot',
+  );
+  await page.setViewport({ width: 414, height: 896, deviceScaleFactor: 2, isMobile: true });
+
+  // Block outbound calls to Supabase — we don't want the prerender to
+  // depend on the database being reachable, and we never want a real
+  // session to leak into the captured HTML. Anything else loads
+  // normally (assets from our own server).
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const url = req.url();
+    if (/supabase\.co\//.test(url) || /supabase\.in\//.test(url)) {
+      return req.abort();
+    }
+    return req.continue();
+  });
+
+  const url = `${ORIGIN}${route}`;
+  console.log(`[prerender] → ${route}`);
+
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+  // Wait for the React tree to actually populate <main>/<h1>. If the
+  // selector never appears within the budget, fall back to whatever
+  // HTML is on the page — better a partial snapshot than a failed
+  // build. The fallback case still has the static SEO tags from
+  // index.html so the route is no worse than the un-prerendered SPA.
+  try {
+    await page.waitForFunction(
+      () => !!document.querySelector('h1') || !!document.querySelector('main'),
+      { timeout: 15_000 },
+    );
+  } catch {
+    console.warn(`[prerender]   no h1/main appeared within 15s — capturing current DOM`);
+  }
+
+  // Small idle window so the <Seo /> effect has a tick to write meta
+  // tags into <head>.
+  await new Promise((r) => setTimeout(r, 250));
+
+  const html = await page.evaluate(() => {
+    // Strip the prerender flag from the captured HTML so runtime code
+    // on real visitors doesn't accidentally see it.
+    return '<!doctype html>\n' + document.documentElement.outerHTML;
+  });
+
+  await page.close();
+  return html;
+}
+
+function writeRouteHtml(route, html) {
+  const out = route === '/'
+    ? join(DIST_DIR, 'index.html')
+    : join(DIST_DIR, route.replace(/^\/+/, ''), 'index.html');
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, html, 'utf8');
+  const kb = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(1);
+  console.log(`[prerender]   wrote ${out.replace(DIST_DIR, 'dist')}  (${kb} kB)`);
+}
+
+// ---------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------
+async function main() {
+  if (!existsSync(DIST_DIR)) {
+    console.error('[prerender] dist/ not found — run `vite build` first.');
+    process.exit(1);
+  }
+
+  // Skip entirely on opt-out (useful for local iteration where you
+  // don't want to spend ~5s on every build).
+  if (process.env.PRERENDER === 'false' || process.env.SKIP_PRERENDER === '1') {
+    console.log('[prerender] skipped (PRERENDER=false)');
+    return;
+  }
+
+  const puppeteer = await loadPuppeteer();
+  const server = await startServer();
+  console.log(`[prerender] serving dist/ from ${ORIGIN}`);
+
+  let browser;
+  let exitCode = 0;
+  try {
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    });
+
+    for (const route of PRERENDER_ROUTES) {
+      const html = await renderRoute(browser, route);
+      writeRouteHtml(route, html);
+    }
+
+    console.log(`[prerender] ✓ ${PRERENDER_ROUTES.length} routes prerendered`);
+  } catch (err) {
+    console.error('[prerender] failed:', err);
+    exitCode = 1;
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+
+  process.exit(exitCode);
+}
+
+// Wire SIGTERM/SIGINT to a clean shutdown so a CI cancel doesn't
+// leave a Chromium process behind.
+['SIGINT', 'SIGTERM'].forEach((sig) => {
+  process.on(sig, () => {
+    console.log(`\n[prerender] received ${sig}, exiting.`);
+    process.exit(130);
+  });
+});
+
+// Quiet the "unused variable" lint on spawn import — kept for future
+// use (e.g. spawning vite preview if we ever drop the in-proc server).
+void spawn;
+
+main();

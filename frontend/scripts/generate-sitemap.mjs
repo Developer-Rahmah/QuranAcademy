@@ -11,6 +11,10 @@
  * the TS module would require ts-node or a build step. The list is
  * tiny (handful of public surfaces) and changes rarely; a unit test
  * could later assert the two stay in sync if drift becomes a concern.
+ *
+ * Each URL declares its own xhtml:link alternates for `ar`, `en` and
+ * `x-default` so Google knows the site serves the same content in two
+ * languages on the same URL (language is a runtime preference).
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -46,18 +50,25 @@ const lastmod = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
 const urls = ROUTES.map(({ path, changefreq, priority }) => {
   const loc = `${SITE_URL}${path === '/' ? '/' : path}`;
+  const safeLoc = escapeXml(loc);
   return [
     '  <url>',
-    `    <loc>${escapeXml(loc)}</loc>`,
+    `    <loc>${safeLoc}</loc>`,
     `    <lastmod>${lastmod}</lastmod>`,
     `    <changefreq>${changefreq}</changefreq>`,
     `    <priority>${priority}</priority>`,
+    // hreflang alternates: same URL serves both AR and EN — the
+    // language is picked client-side and persisted to localStorage.
+    `    <xhtml:link rel="alternate" hreflang="ar" href="${safeLoc}" />`,
+    `    <xhtml:link rel="alternate" hreflang="en" href="${safeLoc}" />`,
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${safeLoc}" />`,
     '  </url>',
   ].join('\n');
 }).join('\n');
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls}
 </urlset>
 `;
