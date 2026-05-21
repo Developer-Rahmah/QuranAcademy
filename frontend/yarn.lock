@@ -544,6 +544,14 @@
   resolved "https://registry.yarnpkg.com/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.56.0.tgz#9eec0212732a432c71bde0350bc40b673d15b2db"
   integrity sha512-H8AE9Ur/t0+1VXujj90w0HrSOuv0Nq9r1vSZF2t5km20NTfosQsGGUXDaKdQZzwuLts7IyL1fYT4hM95TI9c4g==
 
+"@sparticuz/chromium@^123.0.1":
+  version "123.0.1"
+  resolved "https://registry.yarnpkg.com/@sparticuz/chromium/-/chromium-123.0.1.tgz#eb016d419b82c40aca59d02464560bab53694641"
+  integrity sha512-RPrA99xrddbXXZjhUH1WZkTCK3QDQ77t/0y+vULtiW1uAlWLBxorxGnNTuzBDk6eNolxOVFrXZ2aoAN+/eB5TA==
+  dependencies:
+    follow-redirects "^1.15.6"
+    tar-fs "^3.0.5"
+
 "@supabase/auth-js@2.91.1":
   version "2.91.1"
   resolved "https://registry.npmjs.org/@supabase/auth-js/-/auth-js-2.91.1.tgz"
@@ -1661,6 +1669,11 @@ flatted@^3.2.9:
   version "3.3.3"
   resolved "https://registry.npmjs.org/flatted/-/flatted-3.3.3.tgz"
   integrity sha512-GX+ysw4PBCz0PzosHDepZGANEuFCMLrnRTiEy9McGjmkCQYwRq4A/X786G/fjM/+OjsWSU1ZrY5qyARZmO/uwg==
+
+follow-redirects@^1.15.6:
+  version "1.16.0"
+  resolved "https://registry.yarnpkg.com/follow-redirects/-/follow-redirects-1.16.0.tgz#28474a159d3b9d11ef62050a14ed60e4df6d61bc"
+  integrity sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==
 
 for-each@^0.3.3, for-each@^0.3.5:
   version "0.3.5"
@@ -3147,7 +3160,7 @@ tailwindcss@^3.4.0:
     resolve "^1.22.8"
     sucrase "^3.35.0"
 
-tar-fs@^3.0.6:
+tar-fs@^3.0.5, tar-fs@^3.0.6:
   version "3.1.2"
   resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-3.1.2.tgz#114b012f54796f31e62f3e57792820a80b83ae6e"
   integrity sha512-QGxxTxxyleAdyM3kpFs14ymbYmNFrfY+pHj7Z8FgtbZ7w2//VAgLMac7sT6nRpIHjppXO2AwwEOg0bPFVRcmXw==

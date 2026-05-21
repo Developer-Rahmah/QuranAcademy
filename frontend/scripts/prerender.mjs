@@ -106,19 +106,103 @@ function startServer() {
 }
 
 // ---------------------------------------------------------------------
-// Puppeteer launcher — handles missing-Chromium gracefully so the
-// build doesn't hard-fail on a dev machine without the cache.
+// Puppeteer launcher — two paths:
+//
+//   - LOCAL  → import full `puppeteer` (bundled Chrome works on macOS /
+//              Linux dev machines that have GUI libs).
+//   - VERCEL → import `puppeteer-core` (no bundled binary) plus
+//              `@sparticuz/chromium`, whose statically-linked binary
+//              runs on Vercel's minimal Linux build container which is
+//              missing libnss3/libatk/etc.
+//
+// We pick based on env vars set by the host (VERCEL=1, AWS_LAMBDA_*).
+// The same code path also covers any other minimal Linux CI (just set
+// SPARTICUZ=1 explicitly).
 // ---------------------------------------------------------------------
-async function loadPuppeteer() {
+const IS_SERVERLESS =
+  !!process.env.VERCEL ||
+  !!process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.SPARTICUZ === '1';
+
+async function loadPuppeteerAndLaunch(launchExtras = {}) {
+  if (IS_SERVERLESS) {
+    let chromium, puppeteer;
+    try {
+      const chromiumMod = await import('@sparticuz/chromium');
+      chromium = chromiumMod.default ?? chromiumMod;
+      // Disable WebGL / etc. that Chromium can't initialise on a
+      // headless container. The library exposes a `setGraphicsMode`
+      // hook on recent versions; ignore if not present.
+      if (typeof chromium.setGraphicsMode === 'boolean') {
+        chromium.setGraphicsMode = false;
+      } else if (typeof chromium.setHeadlessMode !== 'undefined') {
+        // older API surface — no-op, just don't crash.
+      }
+      // puppeteer is preferred (it re-exports puppeteer-core's API and
+      // honours the same executablePath option). We use whichever one
+      // is installed.
+      try {
+        const mod = await import('puppeteer');
+        puppeteer = mod.default ?? mod;
+      } catch {
+        const mod = await import('puppeteer-core');
+        puppeteer = mod.default ?? mod;
+      }
+    } catch (err) {
+      console.error(
+        '\n[prerender] @sparticuz/chromium is required for Vercel builds.',
+      );
+      console.error('  Install it with:  yarn add -D @sparticuz/chromium\n');
+      throw err;
+    }
+
+    const executablePath = await chromium.executablePath();
+    console.log(`[prerender] launching @sparticuz/chromium at ${executablePath}`);
+    return puppeteer.launch({
+      args: [
+        ...chromium.args,
+        // Belt-and-braces sandbox bypass for container envs that don't
+        // expose the user-namespaces Chromium normally relies on.
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless ?? true,
+      ...launchExtras,
+    });
+  }
+
+  // Local dev path.
+  let puppeteer;
   try {
     const mod = await import('puppeteer');
-    return mod.default ?? mod;
+    puppeteer = mod.default ?? mod;
   } catch (err) {
     console.error('\n[prerender] puppeteer is not installed.');
     console.error('  Install it with:  yarn add -D puppeteer');
     console.error('  Then re-run:      yarn build\n');
     throw err;
   }
+
+  // Honour a CHROME_PATH override so a contributor without the
+  // bundled download can point at a system Chrome (e.g. Chromium
+  // installed via Homebrew).
+  const executablePath = process.env.CHROME_PATH || undefined;
+
+  return puppeteer.launch({
+    headless: 'new',
+    executablePath,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
+    ...launchExtras,
+  });
 }
 
 async function renderRoute(browser, route) {
@@ -214,22 +298,16 @@ async function main() {
     return;
   }
 
-  const puppeteer = await loadPuppeteer();
   const server = await startServer();
-  console.log(`[prerender] serving dist/ from ${ORIGIN}`);
+  console.log(
+    `[prerender] serving dist/ from ${ORIGIN}` +
+      (IS_SERVERLESS ? ' (serverless mode: @sparticuz/chromium)' : ''),
+  );
 
   let browser;
   let exitCode = 0;
   try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
+    browser = await loadPuppeteerAndLaunch();
 
     for (const route of PRERENDER_ROUTES) {
       const html = await renderRoute(browser, route);
