@@ -306,6 +306,26 @@ async function main() {
 
   let browser;
   let exitCode = 0;
+  // Fail-soft policy: on Vercel (and other serverless containers) the
+  // build runner is missing the OS-level shared libs Chromium needs
+  // (libnss3, libatk-bridge2.0, libxkbcommon, …) and `apt-get install`
+  // isn't available without root. @sparticuz/chromium ships some libs
+  // for the Lambda RUNTIME environment but the Vercel BUILD container
+  // has different baseline libs, so the launch can still fail with
+  // "libnss3.so: cannot open shared object file".
+  //
+  // When that happens, we'd rather ship the SPA + the static SEO
+  // baseline (JSON-LD, hreflang, OG, Twitter, sitemap, robots — all
+  // present in dist/index.html from the Vite build) than fail the
+  // whole deploy. The proper long-term fix is to run prerender in a
+  // GitHub Actions job (full Linux, apt-get available) and then
+  // `vercel deploy --prebuilt`. Until that's in place, fail-soft keeps
+  // production green.
+  //
+  // Force fail-hard with PRERENDER_STRICT=1 (use in CI where you DO
+  // want the build to fail if prerender breaks).
+  const failSoft = IS_SERVERLESS && process.env.PRERENDER_STRICT !== '1';
+
   try {
     browser = await loadPuppeteerAndLaunch();
 
@@ -316,8 +336,18 @@ async function main() {
 
     console.log(`[prerender] ✓ ${PRERENDER_ROUTES.length} routes prerendered`);
   } catch (err) {
-    console.error('[prerender] failed:', err);
-    exitCode = 1;
+    if (failSoft) {
+      console.warn('\n[prerender] ⚠  serverless prerender failed — continuing with SPA-only build.');
+      console.warn('[prerender]    Reason:', err && err.message ? err.message : err);
+      console.warn('[prerender]    The static dist/index.html still ships full SEO');
+      console.warn('[prerender]    metadata (title, description, JSON-LD, hreflang,');
+      console.warn('[prerender]    OG, Twitter, sitemap). Routes will SPA-render.');
+      console.warn('[prerender]    To require prerender to succeed, set PRERENDER_STRICT=1.\n');
+      exitCode = 0;
+    } else {
+      console.error('[prerender] failed:', err);
+      exitCode = 1;
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
     server.close();
