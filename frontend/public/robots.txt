@@ -9,14 +9,31 @@
 User-agent: *
 Allow: /
 Disallow: /dashboard
+Disallow: /dashboard/
 Disallow: /admin
+Disallow: /admin/
 Disallow: /halaqah/
 Disallow: /report/
 Disallow: /reset-password
+Disallow: /success
 
-# Auth forms — uncomment to also keep them out of search results.
-# Disallow: /login
-# Disallow: /signup
-# Disallow: /forgot-password
+# Auth forms — kept crawlable so Google can discover them via the
+# global nav, but they're noindex'd at the meta level (see
+# src/lib/seo.ts) so they won't appear in search results.
+
+# Explicitly allow Googlebot variants used for indexing + image search
+User-agent: Googlebot
+Allow: /
+User-agent: Googlebot-Image
+Allow: /
+
+# Block known aggressive scrapers / AI bots that ignore the spirit of
+# the standard — uncomment if you want to opt out of AI training crawls.
+# User-agent: GPTBot
+# Disallow: /
+# User-agent: ClaudeBot
+# Disallow: /
+# User-agent: CCBot
+# Disallow: /
 
 Sitemap: https://www.wahdaynakacademy.com/sitemap.xml

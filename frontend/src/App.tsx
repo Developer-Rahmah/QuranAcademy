@@ -14,7 +14,7 @@
  * role as soon as the profile hydrates (asynchronously) to redirect to the
  * role-specific home.
  */
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
@@ -25,26 +25,66 @@ import { ROUTES, dashboardPathForRole } from "./lib/routes";
 import { api } from "./lib/supabase";
 import { isUserSupervisor } from "./lib/permissions";
 import { Seo } from "./components/atoms/Seo";
-import {
-  Landing,
-  Login,
-  Signup,
-  ForgotPassword,
-  ResetPassword,
-  RegistrationSuccess,
-  StudentRegistration,
-  TeacherRegistration,
-  StudentDashboard,
-  TeacherDashboard,
-  SupervisorDashboard,
-  AdminDashboard,
-  AdminUsers,
-  AdminUserDetail,
-  AdminSettings,
-  HalaqahDetails,
-  AddReport,
-  EditReport,
-} from "./pages";
+// Landing is eager-imported because it's the SEO-critical entry point
+// (`/`) and we want it in the main bundle for fastest first paint /
+// best Core Web Vitals. Every other page is lazy so a visitor landing
+// on `/` doesn't pull the entire authenticated app on first request.
+import { Landing } from "./pages/Landing";
+const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
+const Signup = lazy(() => import("./pages/Signup").then((m) => ({ default: m.Signup })));
+const ForgotPassword = lazy(() =>
+  import("./pages/ForgotPassword").then((m) => ({ default: m.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+  import("./pages/ResetPassword").then((m) => ({ default: m.ResetPassword })),
+);
+const RegistrationSuccess = lazy(() =>
+  import("./pages/RegistrationSuccess").then((m) => ({
+    default: m.RegistrationSuccess,
+  })),
+);
+const StudentRegistration = lazy(() =>
+  import("./pages/StudentRegistration").then((m) => ({
+    default: m.StudentRegistration,
+  })),
+);
+const TeacherRegistration = lazy(() =>
+  import("./pages/TeacherRegistration").then((m) => ({
+    default: m.TeacherRegistration,
+  })),
+);
+const StudentDashboard = lazy(() =>
+  import("./pages/StudentDashboard").then((m) => ({ default: m.StudentDashboard })),
+);
+const TeacherDashboard = lazy(() =>
+  import("./pages/TeacherDashboard").then((m) => ({ default: m.TeacherDashboard })),
+);
+const SupervisorDashboard = lazy(() =>
+  import("./pages/SupervisorDashboard").then((m) => ({
+    default: m.SupervisorDashboard,
+  })),
+);
+const AdminDashboard = lazy(() =>
+  import("./pages/AdminDashboard").then((m) => ({ default: m.AdminDashboard })),
+);
+const AdminUsers = lazy(() =>
+  import("./pages/AdminUsers").then((m) => ({ default: m.AdminUsers })),
+);
+const AdminUserDetail = lazy(() =>
+  import("./pages/AdminUserDetail").then((m) => ({ default: m.AdminUserDetail })),
+);
+const AdminSettings = lazy(() =>
+  import("./pages/AdminSettings").then((m) => ({ default: m.AdminSettings })),
+);
+const HalaqahDetails = lazy(() =>
+  import("./pages/HalaqahDetails").then((m) => ({ default: m.HalaqahDetails })),
+);
+const AddReport = lazy(() =>
+  import("./pages/AddReport").then((m) => ({ default: m.AddReport })),
+);
+const EditReport = lazy(() =>
+  import("./pages/EditReport").then((m) => ({ default: m.EditReport })),
+);
 import type { ReactNode } from "react";
 import type { UserRole } from "./types";
 
@@ -143,7 +183,18 @@ interface PublicRouteProps {
 function PublicRoute({ children }: PublicRouteProps) {
   const { user, loading, isRecoverySession } = useAuth();
 
-  if (loading) return <LoadingSpinner />;
+  // Prerender bypass: when the build-time prerender script (see
+  // scripts/prerender.mjs) loads a public page in headless Chromium it
+  // sets `window.__PRERENDER__ = true` BEFORE app scripts execute. In
+  // that mode we skip the auth-loading spinner so the marketing /
+  // registration page is captured as HTML, not a placeholder spinner.
+  // Real users never have this flag — production behaviour is
+  // unchanged.
+  const isPrerender =
+    typeof window !== "undefined" &&
+    (window as unknown as { __PRERENDER__?: boolean }).__PRERENDER__ === true;
+
+  if (loading && !isPrerender) return <LoadingSpinner />;
 
   // Redirect to dashboard if authenticated, EXCEPT during a recovery
   // flow. We redirect on `user` alone (not waiting for the profile)
@@ -375,7 +426,12 @@ function DashboardDispatcher() {
 // App Routes
 // ============================================
 function AppRoutes() {
+  // Suspense fallback covers the brief window while a lazy page chunk
+  // downloads. Reuses the same spinner the auth guards already show, so
+  // there's no visual jump between "downloading code" and "checking
+  // session" — the user perceives a single smooth load.
   return (
+    <Suspense fallback={<LoadingSpinner />}>
     <Routes>
       {/* Public Routes — every public surface (including the landing
           page) is wrapped in PublicRoute so an authenticated user who
@@ -540,6 +596,7 @@ function AppRoutes() {
       {/* Catch-all */}
       <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

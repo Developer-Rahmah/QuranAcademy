@@ -26,7 +26,22 @@
       "Bash(VITE_COMPLAINTS_API_URL=https://x.example.com npm run build)",
       "Bash(curl -s -i -m 8 https://wahdaynak-complaints-api.vercel.app/healthz)",
       "Bash(curl -s -i -m 8 -X OPTIONS https://wahdaynak-complaints-api.vercel.app/api/complaint -H 'Origin: https://www.wahdaynakacademy.com' -H 'Access-Control-Request-Method: POST')",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(awk '/COMPLAINTS_API_URL/' /Users/rahmah/Documents/QuranAcademy/frontend/dist/assets/index-BqlQIzSk.js)",
+      "Bash(awk '/x\\\\.example\\\\.com/' /Users/rahmah/Documents/QuranAcademy/frontend/dist/assets/index-BqlQIzSk.js)",
+      "Bash(curl -sI https://www.wahdaynakacademy.com/)",
+      "Bash(curl -s https://www.wahdaynakacademy.com/)",
+      "Bash(curl -s https://www.wahdaynakacademy.com/assets/index-fp76KFuN.js -o /tmp/live-bundle.js)",
+      "Read(//tmp/**)",
+      "Bash(curl -sI https://wahdaynak-complaints-api.vercel.app/healthz)",
+      "Bash(curl -s -X POST https://wahdaynak-complaints-api.vercel.app/api/complaint -H 'Content-Type: application/json' -H 'Origin: https://www.wahdaynakacademy.com' -d '{\"name\":\"test\",\"type\":\"bug\",\"message\":\"mobile diag test\"}' -i)",
+      "Bash(curl -s -X POST https://api.wahdaynakacademy.com/api/complaint -H 'Content-Type: application/json' -H 'Origin: https://www.wahdaynakacademy.com' -d '{\"name\":\"test\",\"type\":\"bug\",\"message\":\"mobile test\"}' -i)",
+      "Bash(curl -v -X POST https://api.wahdaynakacademy.com/api/complaint -H 'Content-Type: application/json' -H 'Origin: https://www.wahdaynakacademy.com' -d '{\"name\":\"test\",\"type\":\"bug\",\"message\":\"mobile test\"}')",
+      "Bash(dig +short api.wahdaynakacademy.com)",
+      "Bash(dig +short api.wahdaynakacademy.com @8.8.8.8)",
+      "Bash(dig +short api.wahdaynakacademy.com @1.1.1.1)",
+      "Bash(curl -s --resolve api.wahdaynakacademy.com:443:76.76.21.98 -X POST https://api.wahdaynakacademy.com/api/complaint -H 'Content-Type: application/json' -H 'Origin: https://www.wahdaynakacademy.com' -d '{\"name\":\"test\",\"type\":\"bug\",\"message\":\"mobile test\"}' -i)",
+      "Bash(curl -s --resolve api.wahdaynakacademy.com:443:76.76.21.98 -X OPTIONS https://api.wahdaynakacademy.com/api/complaint -H 'Origin: https://wahdaynakacademy.com' -H 'Access-Control-Request-Method: POST' -i)"
     ]
   }
 }

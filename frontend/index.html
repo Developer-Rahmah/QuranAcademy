@@ -29,8 +29,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- PWA / mobile install metadata -->
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="application-name" content="Wahdaynak Academy" />
+    <meta name="apple-mobile-web-app-title" content="Wahdaynak Academy" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0F4C3A" />
+    <meta name="color-scheme" content="light" />
 
     <!--
       ====================================================================
@@ -52,16 +62,41 @@
     <title>أكاديمية وهديناك — تعليم وتحفيظ القرآن الكريم أونلاين | Wahdaynak Academy</title>
     <meta
       name="description"
-      content="أكاديمية وهديناك لخدمات القرآن الكريم وعلومه: حلقات تحفيظ، تجويد، إجازات، ودورات قرآنية أونلاين بإشراف معلمين متخصصين."
+      content="أكاديمية وهديناك لتعليم وتحفيظ القرآن الكريم أونلاين: حلقات تحفيظ، تجويد، إجازات، ودورات قرآنية بإشراف معلمين متخصصين. Wahdaynak Academy — online Quran memorization, tajweed, and ijazah programs with certified teachers."
     />
     <meta
       name="keywords"
-      content="أكاديمية قرآن, تحفيظ القرآن الكريم, تعليم القرآن, تجويد, إجازة, Quran academy, online Quran learning, memorize Quran, tajweed"
+      content="أكاديمية قرآن, تحفيظ القرآن الكريم, تحفيظ قرآن, تعليم القرآن, تجويد, إجازة قرآن, تعلم القرآن أونلاين, دورات قرآن, مدرس قرآن, معلم قرآن, حلقات تحفيظ, قراءة, ختمة, Quran academy, online Quran learning, memorize Quran, tajweed, Quran teacher, online Quran classes, Islamic studies, ijazah, learn Quran online, hifz"
     />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="Wahdaynak Academy" />
+    <meta name="publisher" content="Wahdaynak Academy" />
+
+    <!-- Search engine site verification placeholders. Replace the
+         content value with the token issued by Google Search Console /
+         Bing Webmaster Tools, or remove the line entirely. -->
+    <!-- <meta name="google-site-verification" content="REPLACE_WITH_GSC_TOKEN" /> -->
+    <!-- <meta name="msvalidate.01" content="REPLACE_WITH_BING_TOKEN" /> -->
 
     <link rel="canonical" href="https://www.wahdaynakacademy.com/" />
+
+    <!--
+      hreflang alternates — tell Google we serve the same content in
+      Arabic and English on the same URL (the language is chosen client
+      side and persisted to localStorage). `x-default` is the entry
+      point for users in any other locale.
+
+      The dynamic <Seo /> component keeps these in sync with the current
+      pathname so deep links also advertise correct alternates.
+    -->
+    <link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/" />
+    <link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/" />
+    <link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/" />
+
+    <!-- Preconnect / DNS-prefetch for first-paint critical origins. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -81,7 +116,11 @@
       property="og:image"
       content="https://www.wahdaynakacademy.com/wahdaynakacademylogo.png"
     />
-    <meta property="og:image:alt" content="شعار أكاديمية وهديناك" />
+    <meta property="og:image:secure_url" content="https://www.wahdaynakacademy.com/wahdaynakacademylogo.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="شعار أكاديمية وهديناك — Wahdaynak Academy logo" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -97,6 +136,68 @@
       name="twitter:image"
       content="https://www.wahdaynakacademy.com/wahdaynakacademylogo.png"
     />
+    <meta name="twitter:image:alt" content="شعار أكاديمية وهديناك — Wahdaynak Academy logo" />
+
+    <!--
+      ====================================================================
+      Structured data (JSON-LD)
+      ====================================================================
+      Tells Google "this site is an educational organisation called
+      Wahdaynak Academy that teaches the Quran online" — eligible for
+      rich-result treatment (knowledge-panel signals, sitelinks search
+      box). Both `EducationalOrganization` and `WebSite` are emitted
+      because they describe different facets of the same entity and
+      Google understands a graph of them.
+
+      Bilingual `name` / `alternateName` so the entity matches Arabic
+      AND English brand queries. `sameAs` should be populated with the
+      academy's verified social profiles once they're live; leave the
+      array as-is until then — empty placeholder URLs hurt trust.
+    -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "EducationalOrganization",
+          "@id": "https://www.wahdaynakacademy.com/#organization",
+          "name": "أكاديمية وهديناك",
+          "alternateName": ["Wahdaynak Academy", "Wahdaynak Quran Academy"],
+          "url": "https://www.wahdaynakacademy.com/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.wahdaynakacademy.com/wahdaynakacademylogo.png",
+            "width": 1200,
+            "height": 1200
+          },
+          "image": "https://www.wahdaynakacademy.com/wahdaynakacademylogo.png",
+          "description": "أكاديمية وهديناك لخدمات القرآن الكريم وعلومه: حلقات تحفيظ، تجويد، إجازات، ودورات قرآنية أونلاين بإشراف معلمين متخصصين. Wahdaynak Academy provides online Quran memorization, tajweed, and ijazah programs with certified teachers.",
+          "inLanguage": ["ar", "en"],
+          "areaServed": "Worldwide",
+          "knowsLanguage": ["Arabic", "English"],
+          "educationalCredentialAwarded": "Quran Ijazah (Sanad)",
+          "teaches": [
+            "Quran memorization (Hifz)",
+            "Tajweed",
+            "Quran recitation (Tilawah)",
+            "Ijazah (Sanad) in Hafs an Asim and other recitations",
+            "تحفيظ القرآن الكريم",
+            "تجويد",
+            "تلاوة وقراءات"
+          ],
+          "sameAs": []
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.wahdaynakacademy.com/#website",
+          "url": "https://www.wahdaynakacademy.com/",
+          "name": "أكاديمية وهديناك — Wahdaynak Academy",
+          "inLanguage": ["ar", "en"],
+          "publisher": { "@id": "https://www.wahdaynakacademy.com/#organization" }
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-background">
     <div id="root"></div>
