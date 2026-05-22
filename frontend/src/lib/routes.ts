@@ -16,6 +16,10 @@ export const ROUTES = {
   success: '/success',
   registerStudent: '/register/student',
   registerTeacher: '/register/teacher',
+  /** Blog index (SEO content surface). */
+  blog: '/blog',
+  /** Single blog article — pattern with :slug param. */
+  blogPost: '/blog/:slug',
 
   /** Neutral dashboard URL — dispatches to the role-specific home. */
   dashboard: '/dashboard',
@@ -32,6 +36,11 @@ export const ROUTES = {
 /** Build a /report/:id/edit URL for a report id. */
 export function reportEditPath(reportId: string): string {
   return `/report/${reportId}/edit`;
+}
+
+/** Build a /blog/:slug URL for a blog post slug. */
+export function blogPostPath(slug: string): string {
+  return `/blog/${slug}`;
 }
 
 /** Build an /admin/users/:id URL from a user id. */

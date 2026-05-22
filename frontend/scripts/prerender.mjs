@@ -31,7 +31,7 @@
  * behaviour is unchanged.
  */
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,15 +42,30 @@ const PORT = Number(process.env.PRERENDER_PORT ?? 4319);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 /**
- * Routes to prerender. Mirrors the public surfaces in `src/lib/routes.ts`
- * and `scripts/generate-sitemap.mjs`. Keep these three in sync — only
- * routes that are noindex (auth forms, authenticated areas) stay out.
+ * Static routes to prerender. Mirrors the public surfaces in
+ * `src/lib/routes.ts` and `scripts/generate-sitemap.mjs`. Auth-form
+ * pages and authenticated areas stay out (they're noindex anyway).
  */
-const PRERENDER_ROUTES = [
+const STATIC_ROUTES = [
   '/',
   '/register/student',
   '/register/teacher',
+  '/blog',
 ];
+
+// Blog posts — read from the JSON manifest so adding an article
+// requires zero changes to this file.
+const MANIFEST_PATH = resolve(__dirname, '..', 'src', 'content', 'blog', 'manifest.json');
+let blogRoutes = [];
+try {
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+  blogRoutes = (manifest.slugs ?? []).map((slug) => `/blog/${slug}`);
+} catch (err) {
+  console.warn(`[prerender] could not read ${MANIFEST_PATH} — skipping blog post prerender.`);
+  console.warn(`[prerender] reason: ${err.message}`);
+}
+
+const PRERENDER_ROUTES = [...STATIC_ROUTES, ...blogRoutes];
 
 // ---------------------------------------------------------------------
 // Tiny static server (mirrors Vercel's static-first, SPA-fallback

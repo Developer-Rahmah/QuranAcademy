@@ -1,22 +1,21 @@
 #!/usr/bin/env node
 /**
  * generate-sitemap — emits `public/sitemap.xml` from the canonical
- * list of public routes. Runs as `prebuild` so the deployed bundle
- * always ships a fresh sitemap; the file is also checked in so
- * editors/IDEs see a consistent state without running the build.
+ * list of public routes + every blog post slug.
  *
- * The route list is mirrored from `src/lib/routes.ts`. We deliberately
- * inline the routes here rather than import from src/ — this is a
- * Node script that runs OUTSIDE the Vite/TS toolchain, and pulling
- * the TS module would require ts-node or a build step. The list is
- * tiny (handful of public surfaces) and changes rarely; a unit test
- * could later assert the two stay in sync if drift becomes a concern.
+ * Runs as `prebuild` so the deployed bundle always ships a fresh
+ * sitemap. The file is also checked in so IDEs see a consistent state
+ * without running the build.
  *
- * Each URL declares its own xhtml:link alternates for `ar`, `en` and
- * `x-default` so Google knows the site serves the same content in two
- * languages on the same URL (language is a runtime preference).
+ * Static routes mirror `src/lib/routes.ts`; blog slugs come from
+ * `src/content/blog/manifest.json` (kept in lockstep with the TS
+ * registry by the developer when adding articles).
+ *
+ * Each URL ships its own `xhtml:link` alternates for `ar`, `en` and
+ * `x-default` — the site serves the same content in both languages on
+ * the same URL (language is a runtime preference).
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,16 +25,30 @@ const SITE_URL = (
   process.env.VITE_SITE_URL ?? 'https://www.wahdaynakacademy.com'
 ).replace(/\/+$/, '');
 
-/**
- * Public, indexable routes only. Auth-form pages and authenticated
- * areas are intentionally excluded — they're noindex'd at the meta
- * level too, so listing them in the sitemap would just be noise.
- */
-const ROUTES = [
+// Static, hand-curated public routes.
+const STATIC_ROUTES = [
   { path: '/', changefreq: 'weekly', priority: '1.0' },
   { path: '/register/student', changefreq: 'monthly', priority: '0.7' },
   { path: '/register/teacher', changefreq: 'monthly', priority: '0.7' },
+  { path: '/blog', changefreq: 'weekly', priority: '0.8' },
 ];
+
+// Blog posts — read from the JSON manifest the runtime registry mirrors.
+const manifestPath = resolve(__dirname, '..', 'src', 'content', 'blog', 'manifest.json');
+let blogRoutes = [];
+try {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  blogRoutes = (manifest.slugs ?? []).map((slug) => ({
+    path: `/blog/${slug}`,
+    changefreq: 'monthly',
+    priority: '0.6',
+  }));
+} catch (err) {
+  console.warn(`[sitemap] could not read ${manifestPath} — emitting sitemap without blog posts.`);
+  console.warn(`[sitemap] reason: ${err.message}`);
+}
+
+const ROUTES = [...STATIC_ROUTES, ...blogRoutes];
 
 function escapeXml(s) {
   return s
@@ -57,8 +70,6 @@ const urls = ROUTES.map(({ path, changefreq, priority }) => {
     `    <lastmod>${lastmod}</lastmod>`,
     `    <changefreq>${changefreq}</changefreq>`,
     `    <priority>${priority}</priority>`,
-    // hreflang alternates: same URL serves both AR and EN — the
-    // language is picked client-side and persisted to localStorage.
     `    <xhtml:link rel="alternate" hreflang="ar" href="${safeLoc}" />`,
     `    <xhtml:link rel="alternate" hreflang="en" href="${safeLoc}" />`,
     `    <xhtml:link rel="alternate" hreflang="x-default" href="${safeLoc}" />`,
@@ -77,4 +88,6 @@ const outPath = resolve(__dirname, '..', 'public', 'sitemap.xml');
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, xml, 'utf8');
 
-console.log(`✓ sitemap.xml written (${ROUTES.length} URLs) → ${outPath}`);
+console.log(
+  `✓ sitemap.xml written (${ROUTES.length} URLs: ${STATIC_ROUTES.length} static + ${blogRoutes.length} blog) → ${outPath}`,
+);

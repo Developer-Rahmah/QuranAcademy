@@ -77,3 +77,8 @@ export { Canonical } from './Canonical';
 // keywords, robots, canonical, Open Graph, Twitter). Mount once
 // inside <BrowserRouter> + <I18nProvider>. Renders nothing.
 export { Seo, buildCanonicalUrl } from './Seo';
+
+// JsonLd — managed <script type="application/ld+json"> for per-page
+// structured data (Article, FAQPage, BreadcrumbList, …). Mount inside
+// any page that needs schema; removed on unmount.
+export { JsonLd } from './JsonLd';

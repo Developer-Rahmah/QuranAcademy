@@ -40,6 +40,7 @@ import {
   DEFAULT_OG_IMAGE,
   resolveSeoEntry,
 } from '../../../lib/seo';
+import { getArticleBySlug } from '../../../content/blog';
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -150,10 +151,21 @@ export function Seo() {
 
     const entry = resolveSeoEntry(pathname);
 
+    // Blog-post override: when on `/blog/<slug>`, pull title /
+    // description / keywords from the article's own metadata. This
+    // avoids registering every slug in SEO_ROUTES and means a new
+    // article's SEO Just Works as soon as it's added to the registry.
+    const blogMatch = /^\/blog\/([^/?#]+)/.exec(pathname);
+    const blogArticle = blogMatch ? getArticleBySlug(blogMatch[1]) : undefined;
+
     // Resolve copy through i18n. Falls back to a sensible global
     // default if a per-route key is missing — the brand name for
     // title, the global tagline for description.
-    const rawTitle = entry ? t(entry.titleKey) : t('seo.defaultTitle');
+    const rawTitle = blogArticle
+      ? blogArticle.title
+      : entry
+        ? t(entry.titleKey)
+        : t('seo.defaultTitle');
     // i18n's `t()` returns the key itself when missing — guard against
     // that so we never render a literal `seo.foo.title` in the tab bar.
     const resolvedTitle =
@@ -163,15 +175,19 @@ export function Seo() {
     const fullTitle =
       pathname === '/' ? resolvedTitle : `${resolvedTitle} — ${academyName}`;
 
-    const description = entry
-      ? t(entry.descriptionKey)
-      : t('seo.defaultDescription');
+    const description = blogArticle
+      ? blogArticle.description
+      : entry
+        ? t(entry.descriptionKey)
+        : t('seo.defaultDescription');
 
-    const keywords = entry?.keywordsKey
-      ? t(entry.keywordsKey)
-      : language === 'ar'
-        ? DEFAULT_KEYWORDS_AR
-        : DEFAULT_KEYWORDS_EN;
+    const keywords = blogArticle
+      ? blogArticle.keywords
+      : entry?.keywordsKey
+        ? t(entry.keywordsKey)
+        : language === 'ar'
+          ? DEFAULT_KEYWORDS_AR
+          : DEFAULT_KEYWORDS_EN;
 
     const robots = entry?.robots ?? 'index, follow';
     const canonicalUrl = buildCanonicalUrl(pathname);
@@ -218,7 +234,19 @@ export function Seo() {
     setMeta('property', 'og:image:width', '1200');
     setMeta('property', 'og:image:height', '630');
     setMeta('property', 'og:image:alt', imageAlt);
-    setMeta('property', 'og:type', 'website');
+    // Blog posts emit `og:type=article` + published/modified time so
+    // social previews show "Article" treatment and Google understands
+    // freshness. Everything else stays `website`.
+    setMeta('property', 'og:type', blogArticle ? 'article' : 'website');
+    if (blogArticle) {
+      setMeta('property', 'article:published_time', blogArticle.publishedAt);
+      setMeta('property', 'article:modified_time', blogArticle.updatedAt);
+      setMeta('property', 'article:author', blogArticle.author);
+      // `article:section` is single-value per spec — we keep the
+      // primary category here. Per-tag values could be emitted via
+      // `article:tag` as a multi-value pair if needed in future.
+      setMeta('property', 'article:section', blogArticle.categories[0] ?? 'hifz');
+    }
     setMeta('property', 'og:site_name', academyName);
     setMeta('property', 'og:locale', ogLocale);
     setMeta('property', 'og:locale:alternate', ogLocaleAlternate);

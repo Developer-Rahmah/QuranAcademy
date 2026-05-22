@@ -384,7 +384,36 @@
     "report": {
       "title": "New report",
       "description": "Add a memorization and review report at Wahdaynak Academy."
+    },
+    "blog": {
+      "title": "Wahdaynak Academy Blog — Quran memorization & tajweed articles",
+      "description": "Expert articles on Quran memorization, tajweed, and teaching methodologies for kids and adults from Wahdaynak Academy."
     }
+  },
+
+  "blog": {
+    "title": "Wahdaynak Blog",
+    "description": "Practical guides for learning the Quran — memorization, tajweed, review techniques. Written for beginners, kids, and busy adults.",
+    "featured": "Featured",
+    "minutesShort": "min read",
+    "tagAll": "All articles",
+    "tagHifz": "Hifz",
+    "tagTajweed": "Tajweed",
+    "tagKids": "Kids",
+    "tagBeginners": "Beginners",
+    "tagReview": "Review",
+    "faqTitle": "Frequently asked questions",
+    "backToList": "Back to blog",
+    "notFoundTitle": "Article not found",
+    "notFoundBody": "We couldn't find the article you were looking for.",
+    "empty": "No articles in this category yet.",
+    "crumbHome": "Home",
+    "crumbBlog": "Blog",
+    "endCtaTitle": "Start your Quran journey today",
+    "endCtaBody": "Join Wahdaynak Academy halaqahs led by certified Quran teachers.",
+    "endCtaStudent": "Register as a student",
+    "endCtaTeacher": "Join as a teacher",
+    "relatedTitle": "Related articles"
   },
 
   "academy": {

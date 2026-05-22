@@ -85,6 +85,12 @@ const AddReport = lazy(() =>
 const EditReport = lazy(() =>
   import("./pages/EditReport").then((m) => ({ default: m.EditReport })),
 );
+const BlogList = lazy(() =>
+  import("./pages/BlogList").then((m) => ({ default: m.BlogList })),
+);
+const BlogPost = lazy(() =>
+  import("./pages/BlogPost").then((m) => ({ default: m.BlogPost })),
+);
 import type { ReactNode } from "react";
 import type { UserRole } from "./types";
 
@@ -498,6 +504,13 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+
+      {/* Blog — fully public, no auth required. Lazy-loaded to keep
+          the landing-page bundle slim. Both routes share the same
+          SEO atom mechanism (Seo reads /blog/<slug> dynamically from
+          the article registry). */}
+      <Route path={ROUTES.blog} element={<BlogList />} />
+      <Route path={ROUTES.blogPost} element={<BlogPost />} />
 
       {/* Authenticated Routes */}
       <Route
