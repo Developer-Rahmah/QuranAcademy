@@ -1,0 +1,15 @@
+{
+  "_comment": "Build-time manifest of blog slugs — read by scripts/generate-sitemap.mjs and scripts/prerender.mjs. Keep in lockstep with src/content/blog/index.ts. Adding an article = add the slug here AND import it in index.ts.",
+  "slugs": [
+    "kayfa-tabda-hifz-al-quran",
+    "tahfeez-quran-lil-atfal",
+    "jadwal-hifz-al-quran-fi-sanah",
+    "al-farq-bayn-al-tajweed-wa-al-hifz",
+    "afdal-waqt-li-hifz-al-quran",
+    "hifz-al-quran-lil-mashghoolin",
+    "tahfeez-al-quran-online-lil-atfal",
+    "turuq-muraja-at-al-quran",
+    "ahamiyyat-hifz-al-quran",
+    "nasaih-li-tathbeet-al-hifz"
+  ]
+}

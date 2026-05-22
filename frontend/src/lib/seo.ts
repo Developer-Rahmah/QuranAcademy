@@ -101,6 +101,18 @@ export const SEO_ROUTES: ReadonlyArray<SeoEntry> = [
     descriptionKey: 'seo.registerTeacher.description',
     robots: 'index, follow',
   },
+  // Blog index. Individual posts (/blog/:slug) are handled DYNAMICALLY
+  // by the Seo component — it looks up the article by slug and uses
+  // the article's own title/description/keywords. No entries here for
+  // each slug — keeps the table small and means adding a new article
+  // requires zero changes to this file.
+  {
+    path: ROUTES.blog,
+    match: 'exact',
+    titleKey: 'seo.blog.title',
+    descriptionKey: 'seo.blog.description',
+    robots: 'index, follow',
+  },
 
   // ----- Auth forms (noindex but follow) -----
   {

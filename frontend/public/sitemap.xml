@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.wahdaynakacademy.com/</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/" />
@@ -12,7 +12,7 @@
   </url>
   <url>
     <loc>https://www.wahdaynakacademy.com/register/student</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/register/student" />
@@ -21,11 +21,110 @@
   </url>
   <url>
     <loc>https://www.wahdaynakacademy.com/register/teacher</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/register/teacher" />
     <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/register/teacher" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/register/teacher" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/kayfa-tabda-hifz-al-quran</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/kayfa-tabda-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/kayfa-tabda-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/kayfa-tabda-hifz-al-quran" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/tahfeez-quran-lil-atfal</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/tahfeez-quran-lil-atfal" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/tahfeez-quran-lil-atfal" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/tahfeez-quran-lil-atfal" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/jadwal-hifz-al-quran-fi-sanah</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/jadwal-hifz-al-quran-fi-sanah" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/jadwal-hifz-al-quran-fi-sanah" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/jadwal-hifz-al-quran-fi-sanah" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/al-farq-bayn-al-tajweed-wa-al-hifz</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/al-farq-bayn-al-tajweed-wa-al-hifz" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/al-farq-bayn-al-tajweed-wa-al-hifz" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/al-farq-bayn-al-tajweed-wa-al-hifz" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/afdal-waqt-li-hifz-al-quran</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/afdal-waqt-li-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/afdal-waqt-li-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/afdal-waqt-li-hifz-al-quran" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/hifz-al-quran-lil-mashghoolin</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/hifz-al-quran-lil-mashghoolin" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/hifz-al-quran-lil-mashghoolin" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/hifz-al-quran-lil-mashghoolin" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/tahfeez-al-quran-online-lil-atfal</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/tahfeez-al-quran-online-lil-atfal" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/tahfeez-al-quran-online-lil-atfal" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/tahfeez-al-quran-online-lil-atfal" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/turuq-muraja-at-al-quran</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/turuq-muraja-at-al-quran" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/turuq-muraja-at-al-quran" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/turuq-muraja-at-al-quran" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/ahamiyyat-hifz-al-quran</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/ahamiyyat-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/ahamiyyat-hifz-al-quran" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/ahamiyyat-hifz-al-quran" />
+  </url>
+  <url>
+    <loc>https://www.wahdaynakacademy.com/blog/nasaih-li-tathbeet-al-hifz</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.wahdaynakacademy.com/blog/nasaih-li-tathbeet-al-hifz" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.wahdaynakacademy.com/blog/nasaih-li-tathbeet-al-hifz" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.wahdaynakacademy.com/blog/nasaih-li-tathbeet-al-hifz" />
   </url>
 </urlset>
