@@ -27,15 +27,20 @@ export function TimeSlotSelector({
   disabled = false,
   error,
   className,
+  multiple = true,
 }: TimeSlotSelectorProps) {
   const { language } = useTranslation();
 
   const handleToggle = (slotId: string) => {
     if (disabled) return;
 
-    const newValue = value.includes(slotId)
-      ? value.filter((id) => id !== slotId)
-      : [...value, slotId];
+    const isSelected = value.includes(slotId);
+    let newValue: string[];
+    if (multiple) {
+      newValue = isSelected ? value.filter((id) => id !== slotId) : [...value, slotId];
+    } else {
+      newValue = isSelected ? [] : [slotId];
+    }
 
     onChange?.(newValue);
   };

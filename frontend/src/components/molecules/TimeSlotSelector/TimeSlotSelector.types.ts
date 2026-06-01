@@ -8,6 +8,7 @@ export interface TimeSlotSelectorProps {
   disabled?: boolean;
   error?: string;
   className?: string;
+  multiple?: boolean;
 }
 
 export interface TimeSlotDisplayProps {

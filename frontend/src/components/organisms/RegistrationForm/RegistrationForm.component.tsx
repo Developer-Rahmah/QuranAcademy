@@ -355,6 +355,7 @@ export function StudentRegistrationForm() {
           value={formData.available_times}
           onChange={(value) => handleChange('available_times', value)}
           error={errors.available_times}
+          multiple={false}
         />
       </FormSection>
 
