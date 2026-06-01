@@ -141,7 +141,7 @@ export const ACADEMY_TIMEZONE = 'Asia/Riyadh';
  * Daytime availability grid, generated from `SESSION_DURATION_HOURS`.
  *
  * The academy doesn't run overnight halaqaat, so slots are restricted
- * to the `DAY_START_HOUR`–`DAY_END_HOUR` window (6 AM → midnight).
+ * to the `DAY_START_HOUR`–`DAY_END_HOUR` window (5 AM → 1 AM next day).
  * Each slot is a `SESSION_DURATION_HOURS`-long block (currently 2h) so
  * the picker matches the real halaqah session length. Ids stay in the
  * canonical `HH-HH` 24h shape for language-neutral storage; the visible
@@ -154,8 +154,8 @@ export const ACADEMY_TIMEZONE = 'Asia/Riyadh';
  * correctly. The selector emits only the new 2-hour ids going forward,
  * so the data self-heals as users re-save their availability.
  */
-export const DAY_START_HOUR = 6;
-export const DAY_END_HOUR = 24;
+export const DAY_START_HOUR = 5;
+export const DAY_END_HOUR = 25;
 
 export const TIME_SLOTS: TimeSlot[] = Array.from(
   { length: Math.floor((DAY_END_HOUR - DAY_START_HOUR) / SESSION_DURATION_HOURS) },
