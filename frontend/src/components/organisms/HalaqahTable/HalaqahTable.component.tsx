@@ -2,10 +2,12 @@
  * HalaqahTable Component
  * Table displaying halaqahs with progress
  */
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../locales/i18n';
 import { Card } from '../../molecules/Card';
 import { Button } from '../../atoms/Button';
+import { Input } from '../../atoms/Input';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { EyeIcon } from '../../atoms/Icon';
 import { StatusBadge } from '../../atoms/Badge';
@@ -16,9 +18,34 @@ import type { HalaqahTableProps } from './HalaqahTable.types';
 /**
  * HalaqahTable - Table displaying halaqahs with progress
  */
-export function HalaqahTable({ halaqahs = [], loading = false, showActions = true }: HalaqahTableProps) {
+export function HalaqahTable({ halaqahs = [], loading = false, showActions = true, searchable = true }: HalaqahTableProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+
+  // Match against the halaqah name + teacher display name (the two
+  // columns the admin actually reads when scanning the list).
+  const filtered = useMemo(() => {
+    if (!searchable) return halaqahs;
+    const q = query.trim().toLowerCase();
+    if (!q) return halaqahs;
+    return halaqahs.filter((h) => {
+      const name = (h.name || '').toLowerCase();
+      const teacher = h.teacher ? getDisplayName(h.teacher).toLowerCase() : '';
+      return name.includes(q) || teacher.includes(q);
+    });
+  }, [halaqahs, query, searchable]);
+
+  const searchBar = searchable && halaqahs.length > 0 ? (
+    <div className="mb-3">
+      <Input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('common.search')}
+      />
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -38,8 +65,21 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
     );
   }
 
+  if (filtered.length === 0) {
+    return (
+      <div>
+        {searchBar}
+        <Card padding="lg">
+          <p className={halaqahTableStyles.empty}>{t('admin.noSearchResults')}</p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <Card padding="none" className={halaqahTableStyles.container}>
+    <div>
+      {searchBar}
+      <Card padding="none" className={halaqahTableStyles.container}>
       <div className={halaqahTableStyles.scrollWrapper}>
         <table className={halaqahTableStyles.table}>
           <thead className={halaqahTableStyles.thead}>
@@ -55,7 +95,7 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
             </tr>
           </thead>
           <tbody className={halaqahTableStyles.tbody}>
-            {halaqahs.map((halaqah, index) => (
+            {filtered.map((halaqah, index) => (
               <tr
                 key={halaqah.id}
                 className={index % 2 === 0 ? halaqahTableStyles.bodyRowEven : halaqahTableStyles.bodyRowOdd}
@@ -104,6 +144,7 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
         </table>
       </div>
     </Card>
+    </div>
   );
 }
 

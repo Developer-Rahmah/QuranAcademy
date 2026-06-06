@@ -19,6 +19,7 @@ import { Modal } from '../../atoms/Modal';
 import { Button } from '../../atoms/Button';
 import { FormField } from '../../molecules/FormField';
 import { Select } from '../../atoms/Select';
+import { SearchableSelect } from '../../atoms/SearchableSelect';
 import { db } from '../../../lib/supabase';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
@@ -227,21 +228,26 @@ export function HalaqahForm({
     return parts.join(' ') || teacher.email;
   };
 
-  // Only expose teachers whose own `segment` matches the halaqah's.
-  // Teachers with a missing/unknown segment are NOT silently bucketed
-  // into either gender — they're excluded so a men's halaqah never
-  // accidentally surfaces a female teacher.
+  // Expose teachers whose own `segment` matches the halaqah's, plus any
+  // teacher registered under the `children` segment. `children` is the
+  // unisex/mixed bucket the registrant chose explicitly — it carries no
+  // gender on the profile (no separate gender column exists), so we
+  // surface those teachers on both the men's and women's section
+  // dropdowns and let the admin pick the right one. Teachers with a
+  // missing/unknown segment are still excluded so a gendered halaqah
+  // never silently inherits an untagged teacher.
   const segmentTeachers = teachers.filter(
-    (teacher) => teacher.segment === formData.segment,
+    (teacher) =>
+      teacher.segment === formData.segment ||
+      teacher.segment === 'children',
   );
 
-  const teacherOptions = [
-    { value: '', label: t(ui.selectTeacherPlaceholder) },
-    ...segmentTeachers.map((teacher) => ({
-      value: teacher.id,
-      label: getTeacherName(teacher),
-    })),
-  ];
+  // SearchableSelect renders its own placeholder when nothing is selected,
+  // so the option list contains only real teachers — no sentinel row.
+  const teacherOptions = segmentTeachers.map((teacher) => ({
+    value: teacher.id,
+    label: getTeacherName(teacher),
+  }));
 
   const levelOptions = [
     { value: 'beginner', label: t('registration.beginner') },
@@ -317,11 +323,12 @@ export function HalaqahForm({
             {t(ui.teacherFieldLabel)}{' '}
             <span className="text-destructive">*</span>
           </label>
-          <Select
+          <SearchableSelect
             value={formData.teacher_id}
             onChange={(e) => handleChange('teacher_id', e.target.value)}
             options={teacherOptions}
             disabled={loadingTeachers}
+            placeholder={t(ui.selectTeacherPlaceholder)}
           />
           {errors.teacher_id && (
             <p className="text-sm text-destructive">{errors.teacher_id}</p>

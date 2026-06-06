@@ -48,6 +48,12 @@ export interface StudentTableProps {
    * omitted the neutral copy is shown.
    */
   segment?: string | null;
+  /**
+   * Renders a built-in search input above the table that filters rows by
+   * name / phone / email. Defaults to `true` — pass `false` only if the
+   * caller already filters upstream or the list is guaranteed tiny.
+   */
+  searchable?: boolean;
 }
 
 export interface StudentCardProps {

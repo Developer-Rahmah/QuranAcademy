@@ -2,7 +2,7 @@
  * Admin Users Page - User management for administrators
  * Allows viewing, activating, and suspending user accounts
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/supabase';
 import { supabase } from '../lib/supabase/client';
@@ -13,6 +13,7 @@ import { segmentationRules } from '../lib/segmentationRules';
 import { uiText } from '../lib/uiText';
 import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
 import { Button } from '../components/atoms/Button';
+import { Input } from '../components/atoms/Input';
 import { Select } from '../components/atoms/Select';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { UsersIcon, TeacherIcon, CheckIcon } from '../components/atoms/Icon';
@@ -92,6 +93,10 @@ export function AdminUsers() {
     status: 'all',
     segment: 'all',
   });
+  // Free-text search across the user's name, email, and phone. Applied
+  // on top of the role/status/segment dropdown filters so all four can
+  // narrow the list together.
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Toggle a single row's selection.
   const toggleSelected = (id: string) => {
@@ -267,6 +272,21 @@ export function AdminUsers() {
     active: users.filter(u => u.status === 'active').length,
   };
 
+  // Apply the free-text search on top of the role/status/segment filters
+  // already baked into `users`. Stats above stay against the unfiltered
+  // (filter-only) list so the summary cards reflect "matches in this
+  // filter selection", not "matches in this search query".
+  const visibleUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => {
+      const name = getDisplayName(u).toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      const phone = (u.phone || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || phone.includes(q);
+    });
+  }, [users, searchQuery]);
+
   // ============================================
   // Filter Options
   // ============================================
@@ -325,6 +345,16 @@ export function AdminUsers() {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="mb-4">
+        <Input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('common.search')}
+        />
+      </div>
+
       {/* Filters */}
       <div className={styles.filtersContainer}>
         <div className={styles.filterGroup}>
@@ -358,7 +388,7 @@ export function AdminUsers() {
       {canDeleteUsers(viewerRole) && selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg bg-secondary/50 border border-border">
           <span className="text-sm text-foreground">
-            {selectedIds.size} / {users.length}
+            {selectedIds.size} / {visibleUsers.length}
           </span>
           <Button
             variant="destructive"
@@ -381,6 +411,10 @@ export function AdminUsers() {
           <div className={styles.emptyState}>
             {t('common.noData')}
           </div>
+        ) : visibleUsers.length === 0 ? (
+          <div className={styles.emptyState}>
+            {t('admin.noSearchResults')}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className={styles.table}>
@@ -392,12 +426,12 @@ export function AdminUsers() {
                         type="checkbox"
                         aria-label={t('admin.selectAll')}
                         checked={
-                          users.length > 0 &&
-                          users.every((u) => selectedIds.has(u.id))
+                          visibleUsers.length > 0 &&
+                          visibleUsers.every((u) => selectedIds.has(u.id))
                         }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedIds(new Set(users.map((u) => u.id)));
+                            setSelectedIds(new Set(visibleUsers.map((u) => u.id)));
                           } else {
                             setSelectedIds(new Set());
                           }
@@ -415,7 +449,7 @@ export function AdminUsers() {
                 </tr>
               </thead>
               <tbody className={styles.tableBody}>
-                {users.map((user) => (
+                {visibleUsers.map((user) => (
                   <tr
                     key={user.id}
                     className={`${styles.tableRow} cursor-pointer`}

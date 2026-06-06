@@ -2,10 +2,12 @@
  * StudentTable Component
  * Table displaying students with their progress
  */
+import { useMemo, useState } from 'react';
 import { useTranslation } from '../../../locales/i18n';
 import { Card } from '../../molecules/Card';
 import { Button } from '../../atoms/Button';
 import { Badge } from '../../atoms/Badge';
+import { Input } from '../../atoms/Input';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { DocumentIcon } from '../../atoms/Icon';
 import { getDisplayName, getFullName, buildWhatsAppLink } from '../../../lib/utils';
@@ -26,8 +28,41 @@ export function StudentTable({
   activationLoadingId = null,
   onViewReports,
   segment,
+  searchable = true,
 }: StudentTableProps) {
   const { t } = useTranslation();
+  const [query, setQuery] = useState('');
+
+  // Filter against the displayed name + contact columns so the search
+  // matches whatever the user can see on the row.
+  const filtered = useMemo(() => {
+    if (!searchable) return students;
+    const q = query.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => {
+      const display = getDisplayName(s).toLowerCase();
+      const full = getFullName(s).toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      const phone = (s.phone || '').toLowerCase();
+      return (
+        display.includes(q) ||
+        full.includes(q) ||
+        email.includes(q) ||
+        phone.includes(q)
+      );
+    });
+  }, [students, query, searchable]);
+
+  const searchBar = searchable && students.length > 0 ? (
+    <div className="mb-3">
+      <Input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('common.search')}
+      />
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -49,8 +84,25 @@ export function StudentTable({
     );
   }
 
+  // Search active but nothing matches: keep the input visible above the
+  // empty-state so the user can clear the query without losing context.
+  if (filtered.length === 0) {
+    return (
+      <div>
+        {searchBar}
+        <Card padding="lg">
+          <p className={studentTableStyles.empty}>
+            {t('admin.noSearchResults')}
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <Card padding="none" className={studentTableStyles.container}>
+    <div>
+      {searchBar}
+      <Card padding="none" className={studentTableStyles.container}>
       <div className={studentTableStyles.scrollWrapper}>
         <table className={studentTableStyles.table}>
           <thead className={studentTableStyles.thead}>
@@ -71,7 +123,7 @@ export function StudentTable({
             </tr>
           </thead>
           <tbody className={studentTableStyles.tbody}>
-            {students.map((student, index) => (
+            {filtered.map((student, index) => (
               <tr
                 key={student.id}
                 className={index % 2 === 0 ? studentTableStyles.bodyRowEven : studentTableStyles.bodyRowOdd}
@@ -184,6 +236,7 @@ export function StudentTable({
         </table>
       </div>
     </Card>
+    </div>
   );
 }
 

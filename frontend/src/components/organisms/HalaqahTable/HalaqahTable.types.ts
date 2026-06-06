@@ -12,4 +12,9 @@ export interface HalaqahTableProps {
   halaqahs?: HalaqahWithStats[];
   loading?: boolean;
   showActions?: boolean;
+  /**
+   * Renders a built-in search input above the table that filters rows by
+   * halaqah name and teacher name. Defaults to `true`.
+   */
+  searchable?: boolean;
 }

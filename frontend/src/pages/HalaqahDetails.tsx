@@ -14,6 +14,7 @@ import { HalaqahForm } from '../components/organisms/HalaqahForm';
 import { StudentAssignment } from '../components/organisms/StudentAssignment';
 import { ProgressBar } from '../components/atoms/ProgressBar';
 import { Button } from '../components/atoms/Button';
+import { Input } from '../components/atoms/Input';
 import { ChartIcon, UsersIcon, SaveIcon, PlusIcon } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
 import { getDisplayName } from '../lib/utils';
@@ -111,6 +112,10 @@ export function HalaqahDetails() {
   const [supervisors, setSupervisors] = useState<HalaqahSupervisorWithProfile[]>([]);
   const [loadingSupervisors, setLoadingSupervisors] = useState(false);
   const [supervisorActionId, setSupervisorActionId] = useState<string | null>(null);
+  // Search queries for the two supervisor lists rendered further down:
+  // the read-only assigned list, and the per-student management picker.
+  const [supervisorSearch, setSupervisorSearch] = useState('');
+  const [manageSupervisorSearch, setManageSupervisorSearch] = useState('');
 
   const fetchSupervisors = useCallback(async () => {
     if (!id) return;
@@ -401,9 +406,32 @@ export function HalaqahDetails() {
               <p className="text-sm text-muted">
                 {t('admin.noSupervisorsAssigned')}
               </p>
-            ) : (
+            ) : (() => {
+              const q = supervisorSearch.trim().toLowerCase();
+              const filteredSupervisors = q
+                ? supervisors.filter((s) => {
+                    const name = s.user ? getDisplayName(s.user).toLowerCase() : '';
+                    const email = (s.user?.email || '').toLowerCase();
+                    return name.includes(q) || email.includes(q);
+                  })
+                : supervisors;
+              return (
+                <>
+                  <div className="mb-3">
+                    <Input
+                      type="text"
+                      value={supervisorSearch}
+                      onChange={(e) => setSupervisorSearch(e.target.value)}
+                      placeholder={t('common.search')}
+                    />
+                  </div>
+                  {filteredSupervisors.length === 0 ? (
+                    <p className="text-sm text-muted">
+                      {t('admin.noSearchResults')}
+                    </p>
+                  ) : (
               <ul className="divide-y divide-border">
-                {supervisors.map((s) => (
+                {filteredSupervisors.map((s) => (
                   <li
                     key={s.id}
                     className="flex items-center justify-between py-3"
@@ -431,13 +459,26 @@ export function HalaqahDetails() {
                   </li>
                 ))}
               </ul>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </Card>
         </PageSection>
 
         {/* Manage supervisors — admin/supervisor_manager only. Each row
             is a member of THIS halaqah, with a single toggle button. */}
-        {canManageSupervisorList && (
+        {canManageSupervisorList && (() => {
+          const q = manageSupervisorSearch.trim().toLowerCase();
+          const filteredManageStudents = q
+            ? students.filter((s) => {
+                const name = getDisplayName(s).toLowerCase();
+                const email = (s.email || '').toLowerCase();
+                const phone = (s.phone || '').toLowerCase();
+                return name.includes(q) || email.includes(q) || phone.includes(q);
+              })
+            : students;
+          return (
           <PageSection title={t('admin.manageSupervisors')}>
             <Card padding="md">
               {students.length === 0 ? (
@@ -445,8 +486,20 @@ export function HalaqahDetails() {
                   {t(uiText.getEmptyStateText('student', halaqah?.segment))}
                 </p>
               ) : (
+                <>
+                <div className="mb-3">
+                  <Input
+                    type="text"
+                    value={manageSupervisorSearch}
+                    onChange={(e) => setManageSupervisorSearch(e.target.value)}
+                    placeholder={t('common.search')}
+                  />
+                </div>
+                {filteredManageStudents.length === 0 ? (
+                  <p className="text-sm text-muted">{t('admin.noSearchResults')}</p>
+                ) : (
                 <ul className="divide-y divide-border">
-                  {students.map((student) => {
+                  {filteredManageStudents.map((student) => {
                     const isSupervisor = supervisorIds.has(student.id);
                     const isMember = memberIds.has(student.id);
                     return (
@@ -485,10 +538,13 @@ export function HalaqahDetails() {
                     );
                   })}
                 </ul>
+                )}
+                </>
               )}
             </Card>
           </PageSection>
-        )}
+          );
+        })()}
       </div>
 
       {/* Edit Halaqah Modal */}

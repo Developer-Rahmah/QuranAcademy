@@ -28,6 +28,7 @@ import { Card, CardContent } from "../components/molecules/Card";
 import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwitcher";
 import { Badge } from "../components/atoms/Badge";
 import { Button } from "../components/atoms/Button";
+import { Input } from "../components/atoms/Input";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useTranslation } from "../locales/i18n";
@@ -254,6 +255,10 @@ export function SupervisorDashboard() {
   const [activationLoadingId, setActivationLoadingId] = useState<string | null>(
     null,
   );
+  // Free-text search applied per-halaqah-panel. A single shared query is
+  // intentional — supervisors typically scan all their halaqahs for the
+  // same name, not different names per halaqah.
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Permission gates.
   //
@@ -470,9 +475,35 @@ export function SupervisorDashboard() {
       {/* Dual-role accounts (student + supervisor) get a top-level
           view switcher. Renders nothing for pure supervisors. */}
       <DashboardViewSwitcher />
+      <div className="mb-4">
+        <Input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t("common.search")}
+        />
+      </div>
       <div className="space-y-8">
         {panels.map((panel) => {
-          const { halaqah, students } = panel;
+          const { halaqah, students: allStudents } = panel;
+          // Apply the shared search query at render time so the input
+          // stays responsive across every halaqah panel without
+          // re-deriving panels[].
+          const q = searchQuery.trim().toLowerCase();
+          const students = q
+            ? allStudents.filter((s) => {
+                const name = (s.name || "").toLowerCase();
+                const full = (s.fullName || "").toLowerCase();
+                const email = (s.email || "").toLowerCase();
+                const phone = (s.phone || "").toLowerCase();
+                return (
+                  name.includes(q) ||
+                  full.includes(q) ||
+                  email.includes(q) ||
+                  phone.includes(q)
+                );
+              })
+            : allStudents;
           const ui = segmentationRules.getGenderedUI({
             role: "teacher",
             segment: halaqah.segment,
@@ -512,7 +543,7 @@ export function SupervisorDashboard() {
                   />
                   <SummaryStat
                     label={t("supervisor.summaryActive")}
-                    value={`${panel.engagedCount} / ${students.length}`}
+                    value={`${panel.engagedCount} / ${allStudents.length}`}
                   />
                   <SummaryStat
                     label={t("supervisor.summaryTopReporter")}
@@ -527,7 +558,9 @@ export function SupervisorDashboard() {
 
                 {students.length === 0 ? (
                   <p className="text-sm text-muted">
-                    {t("supervisor.noStudents")}
+                    {q
+                      ? t("admin.noSearchResults")
+                      : t("supervisor.noStudents")}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -596,7 +629,7 @@ export function SupervisorDashboard() {
 
                 <p className="text-sm text-muted mt-3">
                   {t(uiText.getStudentLabel(halaqah.segment, "plural"))}:{" "}
-                  {students.length}
+                  {allStudents.length}
                 </p>
               </Card>
             </PageSection>
