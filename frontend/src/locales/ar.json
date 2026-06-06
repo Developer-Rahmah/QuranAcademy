@@ -209,7 +209,10 @@
 
   "assignment": {
     "incompatibleGender": "لا يمكن إضافة هذا الطالب إلى الحلقة بسبب اختلاف الجنس",
-    "incompatibleShort": "اختلاف الجنس"
+    "incompatibleShort": "اختلاف الجنس",
+    "filterLabel": "الحلقة",
+    "assigned": "مُسجَّل",
+    "unassigned": "غير مُسجَّل"
   },
 
   "uiText": {
@@ -672,5 +675,21 @@
     "studentRemoved": "تم إزالة الطالبة بنجاح",
     "viewUsers": "إدارة المستخدمين",
     "backToAdmin": "العودة للوحة الإدارة"
+  },
+
+  "matching": {
+    "filterLabel": "تطابق الأوقات",
+    "columnHeader": "تطابق الأوقات",
+    "hasMatches": "يوجد تطابق",
+    "noMatchesLabel": "لا يوجد تطابق",
+    "noMatches": "لا يوجد تطابق",
+    "noMatchesForUser": "لا يوجد أحد في القائمة النشطة يشارك هذا المستخدم أوقاته المتاحة.",
+    "matchingTeachers": "المعلمون المتطابقون",
+    "matchingStudents": "الطلاب المتطابقون",
+    "matches": "تطابقات",
+    "matchesCount": "{{n}} تطابقات",
+    "teacherMatchesCount": "{{n}} معلم/ة متطابق",
+    "studentMatchesCount": "{{n}} طالب/ة متطابق",
+    "sharedSlotCount": "{{n}} وقت مشترك"
   }
 }

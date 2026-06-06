@@ -15,9 +15,11 @@ import { Card, CardContent } from '../components/molecules/Card';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { Button } from '../components/atoms/Button';
 import { ProgressBar } from '../components/atoms/ProgressBar';
-import { api } from '../lib/supabase';
+import { api, db } from '../lib/supabase';
 import { useTranslation } from '../locales/i18n';
-import { ROUTES } from '../lib/routes';
+import { ROUTES, adminUserDetailPath } from '../lib/routes';
+import { MatchingBadge } from '../components/molecules/MatchingBadge';
+import { findMatches } from '../lib/matching';
 import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE, recitationLabelKeyFor } from '../lib/constants';
 import { formatSlotRange } from '../lib/time';
 import { findCountryByIso } from '../lib/countries';
@@ -162,6 +164,11 @@ export function AdminUserDetail() {
   // Teacher-specific
   const [halaqahs, setHalaqahs] = useState<Halaqah[]>([]);
 
+  // Schedule-matching pool. For a student → all active teachers; for a
+  // teacher → all active students. Fetched once and intersected with
+  // the subject's `available_times` to surface compatible pairings.
+  const [oppositePool, setOppositePool] = useState<Profile[]>([]);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -177,19 +184,26 @@ export function AdminUserDetail() {
       }
 
       if (p.role === 'student') {
-        const [m, r, pr] = await Promise.all([
+        const [m, r, pr, pool] = await Promise.all([
           api.halaqah.members.forStudent(p.id),
           api.reports.byStudent(p.id, 20),
           api.reports.stats.studentProgress(p.id),
+          // Opposite-side pool drives the matching section below.
+          db.profiles.getAll({ role: 'teacher', status: 'active' }),
         ]);
         if (cancelled) return;
         setMembership(m.data);
         setReports(r.data ?? []);
         setProgress(pr.data);
+        setOppositePool(pool.data ?? []);
       } else if (p.role === 'teacher') {
-        const { data } = await api.halaqah.list({ teacherId: p.id });
+        const [{ data }, pool] = await Promise.all([
+          api.halaqah.list({ teacherId: p.id }),
+          db.profiles.getAll({ role: 'student', status: 'active' }),
+        ]);
         if (cancelled) return;
         setHalaqahs(data ?? []);
+        setOppositePool(pool.data ?? []);
       }
       setLoading(false);
     };
@@ -225,6 +239,12 @@ export function AdminUserDetail() {
   const isStudent = profile.role === 'student';
   const isTeacher = profile.role === 'teacher';
   const recitations = profile.authorized_recitations ?? [];
+  // Plain const (no useMemo) — early returns above this line make the
+  // hook order conditional, so anything below must not call hooks.
+  // The intersection is O(pool size) over small string sets, trivially
+  // cheap for the few hundred profiles the academy carries.
+  const matches =
+    isStudent || isTeacher ? findMatches(profile, oppositePool) : [];
   const initials =
     `${profile.first_name?.[0] ?? ''}${profile.second_name?.[0] ?? ''}`.trim() || '?';
 
@@ -331,6 +351,32 @@ export function AdminUserDetail() {
           </CardContent>
         </Card>
       </PageSection>
+
+      {/* ---------- Schedule matches (student ↔ teacher) ---------- */}
+      {(isStudent || isTeacher) && (
+        <PageSection
+          title={t(
+            isStudent ? 'matching.matchingTeachers' : 'matching.matchingStudents',
+          )}
+        >
+          <Card>
+            <CardContent className="p-6">
+              {matches.length === 0 ? (
+                <p className={styles.empty}>
+                  {t('matching.noMatchesForUser')}
+                </p>
+              ) : (
+                <MatchingBadge
+                  matches={matches}
+                  subjectRole={profile.role as 'student' | 'teacher'}
+                  to={adminUserDetailPath}
+                  inline
+                />
+              )}
+            </CardContent>
+          </Card>
+        </PageSection>
+      )}
 
       {/* ---------- Student view ---------- */}
       {isStudent && (

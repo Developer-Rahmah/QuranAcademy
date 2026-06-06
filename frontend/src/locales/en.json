@@ -209,7 +209,10 @@
 
   "assignment": {
     "incompatibleGender": "Cannot assign due to gender mismatch",
-    "incompatibleShort": "Gender mismatch"
+    "incompatibleShort": "Gender mismatch",
+    "filterLabel": "Halaqah",
+    "assigned": "Assigned",
+    "unassigned": "Not assigned"
   },
 
   "uiText": {
@@ -672,5 +675,21 @@
     "studentRemoved": "Student removed successfully",
     "viewUsers": "Manage Users",
     "backToAdmin": "Back to Admin"
+  },
+
+  "matching": {
+    "filterLabel": "Schedule match",
+    "columnHeader": "Schedule match",
+    "hasMatches": "Has matches",
+    "noMatchesLabel": "No matches",
+    "noMatches": "No matches",
+    "noMatchesForUser": "No one in the active pool shares this user's available times.",
+    "matchingTeachers": "Matching teachers",
+    "matchingStudents": "Matching students",
+    "matches": "Matches",
+    "matchesCount": "{{n}} matches",
+    "teacherMatchesCount": "{{n}} matching teachers",
+    "studentMatchesCount": "{{n}} matching students",
+    "sharedSlotCount": "{{n}} shared slots"
   }
 }
