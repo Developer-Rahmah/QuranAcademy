@@ -20,6 +20,7 @@ export {
   ChatIcon,
   ChartIcon,
   EyeIcon,
+  EyeOffIcon,
   EditIcon,
   TrashIcon,
   FacebookIcon,

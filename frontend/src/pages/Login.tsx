@@ -8,6 +8,7 @@ import { useToast } from "../context/ToastContext";
 import { useTranslation } from "../locales/i18n";
 import { AuthLayout, AuthCard } from "../components/templates/AuthLayout";
 import { FormField } from "../components/molecules/FormField";
+import { PasswordField } from "../components/molecules/PasswordField";
 import { Button } from "../components/atoms/Button";
 import { isValidEmail } from "../lib/utils";
 import { getErrorMessage } from "../lib/errorHandler";
@@ -112,7 +113,7 @@ export function Login() {
   return (
     <AuthLayout title={t("academy.title")} subtitle={t("academy.subtitle")}>
       <AuthCard>
-        <form onSubmit={handleSubmit} className={loginStyles.form}>
+        <form onSubmit={handleSubmit} noValidate className={loginStyles.form}>
           {errors.submit && (
             <div className={loginStyles.errorBox}>{errors.submit}</div>
           )}
@@ -128,15 +129,15 @@ export function Login() {
             error={errors.email}
           />
 
-          <FormField
+          <PasswordField
             label={t("auth.password")}
             name="password"
-            type="password"
             required
             placeholder={t("auth.enterPassword")}
             value={formData.password}
             onChange={(e) => handleChange("password", e.target.value)}
             error={errors.password}
+            autoComplete="current-password"
           />
 
           <Button type="submit" size="full" loading={loading}>

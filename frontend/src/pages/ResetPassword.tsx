@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { AuthLayout, AuthCard } from '../components/templates/AuthLayout';
-import { FormField } from '../components/molecules/FormField';
+import { PasswordField } from '../components/molecules/PasswordField';
 import { Button } from '../components/atoms/Button';
 import { getErrorMessage } from '../lib/utils';
 
@@ -180,17 +180,16 @@ export function ResetPassword() {
       subtitle="أدخل كلمة المرور الجديدة"
     >
       <AuthCard>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {submitError && (
             <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
               {submitError}
             </div>
           )}
 
-          <FormField
+          <PasswordField
             label="كلمة المرور الجديدة"
             name="password"
-            type="password"
             placeholder="أدخل كلمة المرور الجديدة"
             value={password}
             onChange={(e) => {
@@ -198,12 +197,12 @@ export function ResetPassword() {
               if (fieldError) setFieldError('');
             }}
             error={fieldError && !confirmPassword ? fieldError : ''}
+            autoComplete="new-password"
           />
 
-          <FormField
+          <PasswordField
             label="تأكيد كلمة المرور"
             name="confirmPassword"
-            type="password"
             placeholder="أعد إدخال كلمة المرور"
             value={confirmPassword}
             onChange={(e) => {
@@ -211,6 +210,7 @@ export function ResetPassword() {
               if (fieldError) setFieldError('');
             }}
             error={fieldError && confirmPassword ? fieldError : ''}
+            autoComplete="new-password"
           />
 
           <Button type="submit" size="full" loading={submitting}>

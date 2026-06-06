@@ -21,7 +21,7 @@ import { ROUTES } from '../lib/routes';
 import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE, recitationLabelKeyFor } from '../lib/constants';
 import { formatSlotRange } from '../lib/time';
 import { findCountryByIso } from '../lib/countries';
-import { getDisplayName } from '../lib/utils';
+import { getDisplayName, buildWhatsAppLink } from '../lib/utils';
 import { segmentationRules } from '../lib/segmentationRules';
 import type {
   Profile,
@@ -288,7 +288,31 @@ export function AdminUserDetail() {
           <Card>
             <CardContent className="p-6">
               <InfoRow label={t('auth.email')} value={profile.email} />
-              <InfoRow label={t('registration.phone')} value={profile.phone || '-'} />
+              <InfoRow
+                label={t('registration.phone')}
+                value={
+                  (() => {
+                    // Render the phone as a tap-to-WhatsApp link when the
+                    // number is dialable; fall through to plain text (or
+                    // '-') otherwise. `buildWhatsAppLink` already strips
+                    // formatting and bails on short / empty input.
+                    const link = buildWhatsAppLink(profile.phone);
+                    if (link) {
+                      return (
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {profile.phone}
+                        </a>
+                      );
+                    }
+                    return profile.phone || '-';
+                  })()
+                }
+              />
               {/* ISO-2 → human name, with raw-value fallback. */}
               <InfoRow
                 label={t('registration.country')}

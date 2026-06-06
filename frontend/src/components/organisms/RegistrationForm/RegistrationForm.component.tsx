@@ -13,6 +13,7 @@ import { FormField, FormSection } from '../../molecules/FormField';
 import { ToggleGroup } from '../../molecules/ToggleGroup';
 import { TimeSlotSelector } from '../../molecules/TimeSlotSelector';
 import { PhoneField, toE164 } from '../../molecules/PhoneField';
+import { PasswordField } from '../../molecules/PasswordField';
 import { RecitationField } from '../../molecules/RecitationField';
 import {
   MEMORIZATION_LEVELS,
@@ -21,6 +22,7 @@ import {
 } from '../../../lib/constants';
 import { DEFAULT_COUNTRY_ISO } from '../../../lib/countries';
 import { isValidEmail, validatePassword } from '../../../lib/utils';
+import { validateLocalPhone, normalizeLocalForCountry } from '../../../lib/phoneValidation';
 import { getErrorMessage } from '../../../lib/errorHandler';
 import {
   defaultStudentTypeForSegment,
@@ -104,8 +106,14 @@ export function StudentRegistrationForm() {
     }
     if (!formData.phoneField.country) {
       newErrors.phoneField = t('validation.countryRequired');
-    } else if (!formData.phoneField.local.trim() || formData.phoneField.local.length < 6) {
-      newErrors.phoneField = t('validation.phoneInvalid');
+    } else {
+      const phoneCheck = validateLocalPhone(
+        formData.phoneField.country,
+        formData.phoneField.local,
+      );
+      if (!phoneCheck.isValid) {
+        newErrors.phoneField = t(phoneCheck.messageKey);
+      }
     }
     if (!formData.email.trim()) {
       newErrors.email = t('validation.emailRequired');
@@ -158,7 +166,13 @@ export function StudentRegistrationForm() {
       first_name: formData.first_name,
       second_name: formData.second_name,
       third_name: formData.third_name,
-      phone: toE164(formData.phoneField),
+      phone: toE164({
+        country: formData.phoneField.country,
+        local: normalizeLocalForCountry(
+          formData.phoneField.country,
+          formData.phoneField.local,
+        ),
+      }),
       country: formData.phoneField.country,
       age: parseInt(formData.age),
       role: 'student',
@@ -211,7 +225,7 @@ export function StudentRegistrationForm() {
   ];
 
   return (
-    <form onSubmit={handleSubmit} className={registrationFormStyles.form}>
+    <form onSubmit={handleSubmit} noValidate className={registrationFormStyles.form}>
       {errors.submit && (
         <div className={registrationFormStyles.error.wrapper}>{errors.submit}</div>
       )}
@@ -288,14 +302,14 @@ export function StudentRegistrationForm() {
           onChange={(e) => handleChange('email', e.target.value)}
           error={errors.email}
         />
-        <FormField
+        <PasswordField
           label={t('auth.password')}
           name="password"
-          type="password"
           required
           value={formData.password}
           onChange={(e) => handleChange('password', e.target.value)}
           error={errors.password}
+          autoComplete="new-password"
         />
       </FormSection>
 
@@ -452,8 +466,14 @@ export function TeacherRegistrationForm() {
     }
     if (!formData.phoneField.country) {
       newErrors.phoneField = t('validation.countryRequired');
-    } else if (!formData.phoneField.local.trim() || formData.phoneField.local.length < 6) {
-      newErrors.phoneField = t('validation.phoneInvalid');
+    } else {
+      const phoneCheck = validateLocalPhone(
+        formData.phoneField.country,
+        formData.phoneField.local,
+      );
+      if (!phoneCheck.isValid) {
+        newErrors.phoneField = t(phoneCheck.messageKey);
+      }
     }
     if (!formData.email.trim()) {
       newErrors.email = t('validation.emailRequired');
@@ -510,7 +530,13 @@ export function TeacherRegistrationForm() {
       first_name: formData.first_name,
       second_name: formData.second_name,
       third_name: formData.third_name,
-      phone: toE164(formData.phoneField),
+      phone: toE164({
+        country: formData.phoneField.country,
+        local: normalizeLocalForCountry(
+          formData.phoneField.country,
+          formData.phoneField.local,
+        ),
+      }),
       country: formData.phoneField.country,
       age: parseInt(formData.age),
       role: 'teacher',
@@ -565,7 +591,7 @@ export function TeacherRegistrationForm() {
   ];
 
   return (
-    <form onSubmit={handleSubmit} className={registrationFormStyles.form}>
+    <form onSubmit={handleSubmit} noValidate className={registrationFormStyles.form}>
       {errors.submit && (
         <div className={registrationFormStyles.error.wrapper}>{errors.submit}</div>
       )}
@@ -640,14 +666,14 @@ export function TeacherRegistrationForm() {
           onChange={(e) => handleChange('email', e.target.value)}
           error={errors.email}
         />
-        <FormField
+        <PasswordField
           label={t('auth.password')}
           name="password"
-          type="password"
           required
           value={formData.password}
           onChange={(e) => handleChange('password', e.target.value)}
           error={errors.password}
+          autoComplete="new-password"
         />
       </FormSection>
 

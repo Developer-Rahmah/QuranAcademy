@@ -20,11 +20,22 @@ import { TOTAL_QURAN_PAGES, MIN_PAGES } from './constants';
 // ---------------------------------------------------------------------
 
 /**
- * Email regex — pragmatic shape check (no full RFC 5322). Catches the
- * common typos (missing `@`, missing `.tld`, embedded whitespace) while
- * staying lenient enough that legitimate addresses aren't rejected.
+ * Email regex — pragmatic shape check (no full RFC 5322). Rules:
+ *   - local part: letters, digits, and `._%+-` (typical mailbox chars).
+ *     Cannot start or end with a dot, cannot contain consecutive dots.
+ *   - exactly one `@`.
+ *   - domain: letters/digits/hyphens, dot-separated labels. No leading
+ *     or trailing hyphen on any label.
+ *   - TLD: at least 2 letters (catches `user@gmail.co` typos that the
+ *     old `\.[^\s@]+` regex let through as `user@gmail.c`).
+ *
+ * Length cap: 254 chars (the SMTP `MAIL FROM` limit). Reject anything
+ * longer instead of letting Supabase choke.
  */
-export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_REGEX =
+  /^[A-Za-z0-9_+-]+(?:\.[A-Za-z0-9_+-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
+
+const EMAIL_MAX_LENGTH = 254;
 
 /**
  * Phone regex — international format, leading `+`, country code 1–3
@@ -76,7 +87,9 @@ export function normalizeArabicDigits(input: string): string {
  */
 export function isValidEmail(email: string): boolean {
   if (!email) return false;
-  return EMAIL_REGEX.test(email.trim());
+  const trimmed = email.trim();
+  if (trimmed.length === 0 || trimmed.length > EMAIL_MAX_LENGTH) return false;
+  return EMAIL_REGEX.test(trimmed);
 }
 
 /**

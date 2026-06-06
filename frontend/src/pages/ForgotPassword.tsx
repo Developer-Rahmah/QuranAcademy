@@ -73,7 +73,7 @@ export function ForgotPassword() {
       subtitle="أدخل بريدك الإلكتروني لإعادة تعيين كلمة المرور"
     >
       <AuthCard>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {error && (
             <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
               {error}
