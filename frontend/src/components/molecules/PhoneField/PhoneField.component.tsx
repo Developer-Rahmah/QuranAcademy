@@ -11,8 +11,8 @@
  * The parent keeps track of both fields independently; this component just
  * drives the editing UX.
  */
-import { useMemo } from 'react';
-import { Label, ErrorText } from '../../atoms/Text';
+import { useMemo, type ReactNode } from 'react';
+import { Label, ErrorText, HelpText } from '../../atoms/Text';
 import { COUNTRIES, findCountryByIso, DEFAULT_COUNTRY_ISO } from '../../../lib/countries';
 
 export interface PhoneFieldValue {
@@ -31,6 +31,13 @@ interface PhoneFieldProps {
   error?: string;
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * Static helper text rendered under the input. Suppressed while
+   * `error` is present so the user isn't shown two messages competing
+   * for the same spot. Accepts a ReactNode so callers can mix in icons
+   * (e.g. a WhatsApp glyph for the contact-method hint).
+   */
+  hint?: ReactNode;
 }
 
 /**
@@ -79,6 +86,7 @@ export function PhoneField({
   error,
   placeholder,
   disabled,
+  hint,
 }: PhoneFieldProps) {
   const selected = useMemo(
     () => findCountryByIso(value.country) ?? findCountryByIso(DEFAULT_COUNTRY_ISO)!,
@@ -145,7 +153,7 @@ export function PhoneField({
           onChange={(e) => onChange({ ...value, local: normalizeLocal(e.target.value) })}
         />
       </div>
-      {error && <ErrorText>{error}</ErrorText>}
+      {error ? <ErrorText>{error}</ErrorText> : hint ? <HelpText>{hint}</HelpText> : null}
     </div>
   );
 }

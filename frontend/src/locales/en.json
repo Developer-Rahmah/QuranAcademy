@@ -118,6 +118,7 @@
     "age": "Age",
     "country": "Country",
     "phone": "Phone Number",
+    "phoneWhatsappHint": "Please enter a phone number that has WhatsApp — it's the only way we can contact you.",
     "studentType": "Type",
     "woman": "Woman",
     "man": "Man",
@@ -183,6 +184,9 @@
     "copyLink": "Copy Link",
     "noLink": "Meeting link not set yet",
     "linkCopied": "Link copied!",
+    "meetLinkFilterLabel": "Meeting link",
+    "meetLinkMissing": "No link yet",
+    "meetLinkPresent": "Link set",
     "halaqahLabelMale": "Men's halaqah",
     "halaqahLabelFemale": "Women's halaqah",
     "halaqahLabelNeutral": "Halaqah",
@@ -212,7 +216,12 @@
     "incompatibleShort": "Gender mismatch",
     "filterLabel": "Halaqah",
     "assigned": "Assigned",
-    "unassigned": "Not assigned"
+    "unassigned": "Not assigned",
+    "move": "Move",
+    "confirmMoveTitle": "Move this student?",
+    "confirmMoveBody": "Are you sure you want to move {{student}} from \"{{from}}\" to \"{{to}}\"? This removes them from their current halaqah.",
+    "confirmRemoveTitle": "Remove this student?",
+    "confirmRemoveBody": "Are you sure you want to remove {{student}} from \"{{halaqah}}\"? This cannot be undone."
   },
 
   "uiText": {
@@ -657,6 +666,11 @@
     "segmentRequired": "Please select a segment",
     "halaqahCreated": "Halaqah created successfully",
     "halaqahUpdated": "Halaqah updated successfully",
+    "deleteHalaqah": "Delete halaqah",
+    "confirmDeleteHalaqahTitle": "Delete this halaqah?",
+    "confirmDeleteHalaqahBody": "This will permanently delete the halaqah and remove every student, supervisor, and report attached to it. This cannot be undone.",
+    "halaqahDeleted": "Halaqah deleted",
+    "halaqahDeleteFailed": "Could not delete the halaqah",
     "enterHalaqahName": "Enter halaqah name",
     "selectTeacher": "Select teacher",
     "teacherRequired": "Teacher is required",
@@ -673,6 +687,7 @@
     "remove": "Remove",
     "studentAssigned": "Student assigned successfully",
     "studentRemoved": "Student removed successfully",
+    "studentMoved": "Student moved successfully",
     "viewUsers": "Manage Users",
     "backToAdmin": "Back to Admin"
   },
@@ -691,5 +706,33 @@
     "teacherMatchesCount": "{{n}} matching teachers",
     "studentMatchesCount": "{{n}} matching students",
     "sharedSlotCount": "{{n}} shared slots"
+  },
+
+  "pagination": {
+    "label": "Pagination",
+    "prev": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{total}}"
+  },
+
+  "whatsapp": {
+    "send": "Send via WhatsApp",
+    "sendConfirmation": "Send WhatsApp confirmation",
+    "dialogTitle": "Send WhatsApp message",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Type the message you want to send…",
+    "messageHelp": "Edit before sending. Save as default to start every future send from this version.",
+    "saveDefault": "Save as default",
+    "reset": "Reset to original",
+    "noPhone": "This user has no phone number on file."
+  },
+
+  "autoAssign": {
+    "halaqahsCreated": "Created {{n}} halaqahs for {{name}}",
+    "halaqahsCreateFailed": "Could not create halaqahs for this teacher",
+    "studentAssigned": "Assigned to {{halaqah}}",
+    "studentNoMatch": "No matching halaqah yet — leave as unassigned",
+    "scanCompletedAssigned": "Auto-assigned {{n}} matching students to the new halaqahs",
+    "scanCompletedNone": "No matching unassigned students to auto-assign"
   }
 }

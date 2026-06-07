@@ -8,3 +8,5 @@ export {
   useStudentProgress,
   useAcademyStats,
 } from './useReports';
+export { usePagination, DEFAULT_PAGE_SIZE } from './usePagination';
+export type { PaginationState } from './usePagination';

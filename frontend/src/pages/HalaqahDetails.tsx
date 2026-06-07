@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useHalaqah } from '../hooks/useHalaqah';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -15,7 +15,10 @@ import { StudentAssignment } from '../components/organisms/StudentAssignment';
 import { ProgressBar } from '../components/atoms/ProgressBar';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
-import { ChartIcon, UsersIcon, SaveIcon, PlusIcon } from '../components/atoms/Icon';
+import { ChartIcon, UsersIcon, SaveIcon, PlusIcon, TrashIcon } from '../components/atoms/Icon';
+import { ConfirmDialog } from '../components/molecules/ConfirmDialog';
+import { PaginatedList } from '../components/molecules/Pagination';
+import { ROUTES } from '../lib/routes';
 import { useTranslation } from '../locales/i18n';
 import { getDisplayName } from '../lib/utils';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
@@ -40,6 +43,7 @@ interface HalaqahStats {
  */
 export function HalaqahDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
   const toast = useToast();
@@ -106,6 +110,31 @@ export function HalaqahDetails() {
   });
   const [showEditForm, setShowEditForm] = useState(false);
   const [showStudentAssignment, setShowStudentAssignment] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingHalaqah, setDeletingHalaqah] = useState(false);
+
+  // Delete the halaqah. CASCADE on halaqahs.id covers halaqah_members,
+  // halaqah_supervisors, and reports — see migration 0001. On success
+  // we navigate back to the admin dashboard since this very URL would
+  // 404 the next time anyway. RLS still enforces who can run the
+  // delete server-side; the UI button is gated by `canManage`.
+  const handleDeleteHalaqah = async () => {
+    if (!id) return;
+    setDeletingHalaqah(true);
+    try {
+      const { error } = await db.halaqahs.delete(id);
+      if (error) {
+        console.error('Error deleting halaqah:', error);
+        toast.error(t('admin.halaqahDeleteFailed'));
+        return;
+      }
+      toast.success(t('admin.halaqahDeleted'));
+      setShowDeleteConfirm(false);
+      navigate(ROUTES.admin);
+    } finally {
+      setDeletingHalaqah(false);
+    }
+  };
 
   // Supervisor assignments for this halaqah. The set of `user_id`s drives
   // the per-student "Assign / Remove" toggle.
@@ -307,6 +336,13 @@ export function HalaqahDetails() {
               <PlusIcon className="w-4 h-4" />
               {t(uiText.getManageStudentsLabel(halaqah?.segment))}
             </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <TrashIcon className="w-4 h-4" />
+              {t('admin.deleteHalaqah')}
+            </Button>
           </div>
         )}
 
@@ -430,35 +466,39 @@ export function HalaqahDetails() {
                       {t('admin.noSearchResults')}
                     </p>
                   ) : (
-              <ul className="divide-y divide-border">
-                {filteredSupervisors.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between py-3"
-                  >
-                    <div>
-                      <p className="text-base text-foreground">
-                        {s.user
-                          ? getDisplayName(s.user)
-                          : s.user_id}
-                      </p>
-                      {s.user?.email && (
-                        <p className="text-sm text-muted">{s.user.email}</p>
+                    <PaginatedList items={filteredSupervisors}>
+                      {(pageItems) => (
+                        <ul className="divide-y divide-border">
+                          {pageItems.map((s) => (
+                            <li
+                              key={s.id}
+                              className="flex items-center justify-between py-3"
+                            >
+                              <div>
+                                <p className="text-base text-foreground">
+                                  {s.user
+                                    ? getDisplayName(s.user)
+                                    : s.user_id}
+                                </p>
+                                {s.user?.email && (
+                                  <p className="text-sm text-muted">{s.user.email}</p>
+                                )}
+                              </div>
+                              {canManageSupervisorList && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleRemove(s.user_id)}
+                                  loading={supervisorActionId === s.user_id}
+                                >
+                                  {t('admin.removeSupervisor')}
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                    </div>
-                    {canManageSupervisorList && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleRemove(s.user_id)}
-                        loading={supervisorActionId === s.user_id}
-                      >
-                        {t('admin.removeSupervisor')}
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                    </PaginatedList>
                   )}
                 </>
               );
@@ -498,46 +538,50 @@ export function HalaqahDetails() {
                 {filteredManageStudents.length === 0 ? (
                   <p className="text-sm text-muted">{t('admin.noSearchResults')}</p>
                 ) : (
-                <ul className="divide-y divide-border">
-                  {filteredManageStudents.map((student) => {
-                    const isSupervisor = supervisorIds.has(student.id);
-                    const isMember = memberIds.has(student.id);
-                    return (
-                      <li
-                        key={student.id}
-                        className="flex items-center justify-between py-3"
-                      >
-                        <span className="text-base text-foreground">
-                          {getDisplayName(student)}
-                        </span>
-                        {isSupervisor ? (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleRemove(student.id)}
-                            loading={supervisorActionId === student.id}
-                          >
-                            {t('admin.removeSupervisor')}
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => handleAssign(student.id)}
-                            loading={supervisorActionId === student.id}
-                            disabled={!isMember}
-                            title={
-                              !isMember
-                                ? t('admin.studentNotInHalaqah')
-                                : undefined
-                            }
-                          >
-                            {t('admin.assignAsSupervisor')}
-                          </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                  <PaginatedList items={filteredManageStudents}>
+                    {(pageItems) => (
+                      <ul className="divide-y divide-border">
+                        {pageItems.map((student) => {
+                          const isSupervisor = supervisorIds.has(student.id);
+                          const isMember = memberIds.has(student.id);
+                          return (
+                            <li
+                              key={student.id}
+                              className="flex items-center justify-between py-3"
+                            >
+                              <span className="text-base text-foreground">
+                                {getDisplayName(student)}
+                              </span>
+                              {isSupervisor ? (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleRemove(student.id)}
+                                  loading={supervisorActionId === student.id}
+                                >
+                                  {t('admin.removeSupervisor')}
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAssign(student.id)}
+                                  loading={supervisorActionId === student.id}
+                                  disabled={!isMember}
+                                  title={
+                                    !isMember
+                                      ? t('admin.studentNotInHalaqah')
+                                      : undefined
+                                  }
+                                >
+                                  {t('admin.assignAsSupervisor')}
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </PaginatedList>
                 )}
                 </>
               )}
@@ -571,6 +615,17 @@ export function HalaqahDetails() {
               refetch?.();
               void fetchSupervisors();
             }}
+          />
+          <ConfirmDialog
+            isOpen={showDeleteConfirm}
+            onClose={() => {
+              if (!deletingHalaqah) setShowDeleteConfirm(false);
+            }}
+            onConfirm={handleDeleteHalaqah}
+            title={t('admin.confirmDeleteHalaqahTitle')}
+            body={t('admin.confirmDeleteHalaqahBody')}
+            confirmLabel={t('admin.deleteHalaqah')}
+            loading={deletingHalaqah}
           />
         </>
       )}

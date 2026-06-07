@@ -118,6 +118,7 @@
     "age": "العمر",
     "country": "الدولة",
     "phone": "رقم الهاتف",
+    "phoneWhatsappHint": "يرجى إدخال رقم هاتف مفعّل عليه واتساب — هذه هي وسيلتنا الوحيدة للتواصل معك.",
     "studentType": "النوع",
     "woman": "امرأة",
     "man": "رجل",
@@ -183,6 +184,9 @@
     "copyLink": "نسخ الرابط",
     "noLink": "لم يتم تحديد رابط الاجتماع بعد",
     "linkCopied": "تم نسخ الرابط!",
+    "meetLinkFilterLabel": "رابط الاجتماع",
+    "meetLinkMissing": "بدون رابط",
+    "meetLinkPresent": "يوجد رابط",
     "halaqahLabelMale": "حلقة الرجال",
     "halaqahLabelFemale": "حلقة النساء",
     "halaqahLabelNeutral": "الحلقة",
@@ -212,7 +216,12 @@
     "incompatibleShort": "اختلاف الجنس",
     "filterLabel": "الحلقة",
     "assigned": "مُسجَّل",
-    "unassigned": "غير مُسجَّل"
+    "unassigned": "غير مُسجَّل",
+    "move": "نقل",
+    "confirmMoveTitle": "هل تريد نقل هذا الطالب؟",
+    "confirmMoveBody": "هل تريد نقل {{student}} من «{{from}}» إلى «{{to}}»؟ سيتم إزالته من حلقته الحالية.",
+    "confirmRemoveTitle": "هل تريد إزالة هذا الطالب؟",
+    "confirmRemoveBody": "هل أنت متأكد من إزالة {{student}} من «{{halaqah}}»؟ لا يمكن التراجع عن هذا الإجراء."
   },
 
   "uiText": {
@@ -657,6 +666,11 @@
     "segmentRequired": "يجب اختيار القسم",
     "halaqahCreated": "تم إنشاء الحلقة بنجاح",
     "halaqahUpdated": "تم تحديث الحلقة بنجاح",
+    "deleteHalaqah": "حذف الحلقة",
+    "confirmDeleteHalaqahTitle": "هل تريد حذف هذه الحلقة؟",
+    "confirmDeleteHalaqahBody": "سيتم حذف الحلقة نهائياً مع جميع الطلاب والمشرفين والتقارير المرتبطة بها. لا يمكن التراجع عن هذا الإجراء.",
+    "halaqahDeleted": "تم حذف الحلقة",
+    "halaqahDeleteFailed": "تعذّر حذف الحلقة",
     "enterHalaqahName": "أدخل اسم الحلقة",
     "selectTeacher": "اختر المعلمة",
     "teacherRequired": "يجب اختيار المعلمة",
@@ -673,6 +687,7 @@
     "remove": "إزالة",
     "studentAssigned": "تم إضافة الطالبة بنجاح",
     "studentRemoved": "تم إزالة الطالبة بنجاح",
+    "studentMoved": "تم نقل الطالبة بنجاح",
     "viewUsers": "إدارة المستخدمين",
     "backToAdmin": "العودة للوحة الإدارة"
   },
@@ -691,5 +706,33 @@
     "teacherMatchesCount": "{{n}} معلم/ة متطابق",
     "studentMatchesCount": "{{n}} طالب/ة متطابق",
     "sharedSlotCount": "{{n}} وقت مشترك"
+  },
+
+  "pagination": {
+    "label": "ترقيم الصفحات",
+    "prev": "السابق",
+    "next": "التالي",
+    "pageOf": "صفحة {{page}} من {{total}}"
+  },
+
+  "whatsapp": {
+    "send": "إرسال عبر واتساب",
+    "sendConfirmation": "إرسال تأكيد عبر واتساب",
+    "dialogTitle": "إرسال رسالة واتساب",
+    "messageLabel": "نص الرسالة",
+    "messagePlaceholder": "اكتب الرسالة التي تريد إرسالها…",
+    "messageHelp": "يمكنك تعديل النص قبل الإرسال. احفظه كافتراضي لتبدأ كل رسالة قادمة من هذه النسخة.",
+    "saveDefault": "حفظ كافتراضي",
+    "reset": "استعادة الأصلي",
+    "noPhone": "لا يوجد رقم هاتف مسجَّل لهذا المستخدم."
+  },
+
+  "autoAssign": {
+    "halaqahsCreated": "تم إنشاء {{n}} حلقات لـ {{name}}",
+    "halaqahsCreateFailed": "تعذّر إنشاء حلقات لهذا المعلم/ة",
+    "studentAssigned": "تم إضافته إلى حلقة {{halaqah}}",
+    "studentNoMatch": "لا توجد حلقة مطابقة حالياً — يبقى دون تعيين",
+    "scanCompletedAssigned": "تم تعيين {{n}} طلاب مطابقين تلقائياً للحلقات الجديدة",
+    "scanCompletedNone": "لا يوجد طلاب غير معينين مطابقين للتعيين التلقائي"
   }
 }

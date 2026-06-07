@@ -16,6 +16,8 @@ import { Link } from 'react-router-dom';
 import { Logo } from '../components/atoms/Logo';
 import { LanguageSwitcher } from '../components/atoms/LanguageSwitcher';
 import { JsonLd } from '../components/atoms/JsonLd';
+import { Pagination } from '../components/molecules/Pagination';
+import { usePagination } from '../hooks/usePagination';
 import { useTranslation } from '../locales/i18n';
 import { useSettings } from '../context/SettingsContext';
 import { ROUTES, blogPostPath } from '../lib/routes';
@@ -44,6 +46,10 @@ export function BlogList() {
         .filter((a) => a.slug !== featured.slug),
     [activeCategory, featured.slug],
   );
+
+  // Page through the filtered grid. Page resets to 0 when the user
+  // picks a new category (usePagination clamps automatically).
+  const { page, setPage, pageItems, pageCount } = usePagination(articles);
 
   // Blog hub schema — helps Google identify this as a section index.
   const blogSchema = useMemo(
@@ -140,8 +146,9 @@ export function BlogList() {
         {articles.length === 0 ? (
           <p className="text-center text-muted py-12">{t('blog.empty')}</p>
         ) : (
+          <>
           <ul className="grid gap-6 sm:grid-cols-2">
-            {articles.map((a) => (
+            {pageItems.map((a) => (
               <li key={a.slug}>
                 <Link
                   to={blogPostPath(a.slug)}
@@ -170,6 +177,8 @@ export function BlogList() {
               </li>
             ))}
           </ul>
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+          </>
         )}
       </main>
 

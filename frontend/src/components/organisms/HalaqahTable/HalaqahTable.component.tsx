@@ -11,6 +11,8 @@ import { Input } from '../../atoms/Input';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { EyeIcon } from '../../atoms/Icon';
 import { StatusBadge } from '../../atoms/Badge';
+import { Pagination } from '../../molecules/Pagination';
+import { usePagination } from '../../../hooks/usePagination';
 import { getDisplayName } from '../../../lib/utils';
 import { halaqahTableStyles } from './HalaqahTable.style';
 import type { HalaqahTableProps } from './HalaqahTable.types';
@@ -35,6 +37,10 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
       return name.includes(q) || teacher.includes(q);
     });
   }, [halaqahs, query, searchable]);
+
+  // Paginate the filtered list. usePagination clamps the active page
+  // when the filter narrows the dataset (e.g. search query change).
+  const { page, setPage, pageItems, pageCount } = usePagination(filtered);
 
   const searchBar = searchable && halaqahs.length > 0 ? (
     <div className="mb-3">
@@ -95,7 +101,7 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
             </tr>
           </thead>
           <tbody className={halaqahTableStyles.tbody}>
-            {filtered.map((halaqah, index) => (
+            {pageItems.map((halaqah, index) => (
               <tr
                 key={halaqah.id}
                 className={index % 2 === 0 ? halaqahTableStyles.bodyRowEven : halaqahTableStyles.bodyRowOdd}
@@ -144,6 +150,7 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
         </table>
       </div>
     </Card>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </div>
   );
 }

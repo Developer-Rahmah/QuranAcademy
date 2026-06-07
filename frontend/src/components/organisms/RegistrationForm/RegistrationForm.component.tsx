@@ -292,6 +292,7 @@ export function StudentRegistrationForm() {
           value={formData.phoneField}
           onChange={(v) => handleChange('phoneField', v)}
           error={errors.phoneField}
+          hint={t('registration.phoneWhatsappHint')}
         />
         <FormField
           label={t('auth.email')}
@@ -656,6 +657,7 @@ export function TeacherRegistrationForm() {
           value={formData.phoneField}
           onChange={(v) => handleChange('phoneField', v)}
           error={errors.phoneField}
+          hint={t('registration.phoneWhatsappHint')}
         />
         <FormField
           label={t('auth.email')}

@@ -29,6 +29,8 @@ import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwit
 import { Badge } from "../components/atoms/Badge";
 import { Button } from "../components/atoms/Button";
 import { Input } from "../components/atoms/Input";
+import { Pagination } from "../components/molecules/Pagination";
+import { usePagination } from "../hooks/usePagination";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useTranslation } from "../locales/i18n";
@@ -484,163 +486,209 @@ export function SupervisorDashboard() {
         />
       </div>
       <div className="space-y-8">
-        {panels.map((panel) => {
-          const { halaqah, students: allStudents } = panel;
-          // Apply the shared search query at render time so the input
-          // stays responsive across every halaqah panel without
-          // re-deriving panels[].
-          const q = searchQuery.trim().toLowerCase();
-          const students = q
-            ? allStudents.filter((s) => {
-                const name = (s.name || "").toLowerCase();
-                const full = (s.fullName || "").toLowerCase();
-                const email = (s.email || "").toLowerCase();
-                const phone = (s.phone || "").toLowerCase();
-                return (
-                  name.includes(q) ||
-                  full.includes(q) ||
-                  email.includes(q) ||
-                  phone.includes(q)
-                );
-              })
-            : allStudents;
-          const ui = segmentationRules.getGenderedUI({
-            role: "teacher",
-            segment: halaqah.segment,
-          });
-          const segmentKey =
-            halaqah.segment === "men"
-              ? "segment.men"
-              : halaqah.segment === "women"
-                ? "segment.women"
-                : "";
-
-          return (
-            <PageSection
-              key={halaqah.id}
-              title={`${t(ui.halaqahLabel)} — ${halaqah.name}`}
-            >
-              <Card padding="md" variant="bordered">
-                {/* Halaqah meta */}
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <span className="text-base text-muted">
-                    {t("supervisor.halaqahName")}:
-                  </span>
-                  <span className="text-base font-medium text-foreground">
-                    {halaqah.name}
-                  </span>
-                  {segmentKey && (
-                    <Badge variant="secondary">{t(segmentKey)}</Badge>
-                  )}
-                </div>
-
-                {/* Aggregate summary cards — drives the supervisor's
-                    quick read of the halaqah's overall health. */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                  <SummaryStat
-                    label={t("supervisor.summaryReports30")}
-                    value={String(panel.reports30dTotal)}
-                  />
-                  <SummaryStat
-                    label={t("supervisor.summaryActive")}
-                    value={`${panel.engagedCount} / ${allStudents.length}`}
-                  />
-                  <SummaryStat
-                    label={t("supervisor.summaryTopReporter")}
-                    value={panel.topReporter?.name ?? t("supervisor.noneYet")}
-                  />
-                  <SummaryStat
-                    label={t("supervisor.summaryNeedsAttention")}
-                    value={String(panel.needsAttention)}
-                    accent={panel.needsAttention > 0 ? "warning" : undefined}
-                  />
-                </div>
-
-                {students.length === 0 ? (
-                  <p className="text-sm text-muted">
-                    {q
-                      ? t("admin.noSearchResults")
-                      : t("supervisor.noStudents")}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-base">
-                      <thead className="bg-muted/40">
-                        <tr>
-                          <th className="px-3 py-2 w-8" aria-hidden="true" />
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.studentName")}
-                          </th>
-                          {canSeeContact && (
-                            <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                              {t("student.contact")}
-                            </th>
-                          )}
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.consistency30")}
-                          </th>
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.last7Days")}
-                          </th>
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.memorizationPages")}
-                          </th>
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.reviewPages")}
-                          </th>
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.totalReports")}
-                          </th>
-                          <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                            {t("supervisor.lastActivity")}
-                          </th>
-                          {canActivate && (
-                            <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
-                              {t("student.activation")}
-                            </th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {students.map((s) => {
-                          const expandKey = `${halaqah.id}:${s.id}`;
-                          const isOpen = expanded.has(expandKey);
-                          return (
-                            <FragmentRow
-                              key={s.id}
-                              student={s}
-                              isOpen={isOpen}
-                              expandKey={expandKey}
-                              onToggle={toggleExpanded}
-                              tierLabel={t(tierLabelKey(s.tier))}
-                              recencyLabel={formatRecency(s)}
-                              showContact={canSeeContact}
-                              showActivation={canActivate}
-                              activationLoadingId={activationLoadingId}
-                              onToggleActivation={handleToggleActivation}
-                              t={t}
-                            />
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                <p className="text-sm text-muted mt-3">
-                  {t(uiText.getStudentLabel(halaqah.segment, "plural"))}:{" "}
-                  {allStudents.length}
-                </p>
-              </Card>
-            </PageSection>
-          );
-        })}
+        {panels.map((panel) => (
+          <HalaqahPanelView
+            key={panel.halaqah.id}
+            panel={panel}
+            searchQuery={searchQuery}
+            expanded={expanded}
+            toggleExpanded={toggleExpanded}
+            canSeeContact={canSeeContact}
+            canActivate={canActivate}
+            activationLoadingId={activationLoadingId}
+            handleToggleActivation={handleToggleActivation}
+            t={t}
+            formatRecency={formatRecency}
+          />
+        ))}
       </div>
     </DashboardLayout>
   );
 }
 
 // ---------------- Sub-components --------------------------------------
+
+/**
+ * Per-halaqah panel. Extracted so each instance can own its own
+ * `usePagination` state — hooks can't be called inside the parent's
+ * `panels.map(...)` loop. Search filtering + pagination are derived
+ * locally; the parent owns the shared search query and the expand
+ * set, both passed in.
+ */
+function HalaqahPanelView({
+  panel,
+  searchQuery,
+  expanded,
+  toggleExpanded,
+  canSeeContact,
+  canActivate,
+  activationLoadingId,
+  handleToggleActivation,
+  t,
+  formatRecency,
+}: {
+  panel: HalaqahPanel;
+  searchQuery: string;
+  expanded: Set<string>;
+  toggleExpanded: (key: string) => void;
+  canSeeContact: boolean;
+  canActivate: boolean;
+  activationLoadingId: string | null;
+  handleToggleActivation: (row: StudentRow) => void;
+  t: (key: string) => string;
+  formatRecency: (s: StudentRow) => string;
+}) {
+  const { halaqah, students: allStudents } = panel;
+
+  const q = searchQuery.trim().toLowerCase();
+  const students = q
+    ? allStudents.filter((s) => {
+        const name = (s.name || "").toLowerCase();
+        const full = (s.fullName || "").toLowerCase();
+        const email = (s.email || "").toLowerCase();
+        const phone = (s.phone || "").toLowerCase();
+        return (
+          name.includes(q) ||
+          full.includes(q) ||
+          email.includes(q) ||
+          phone.includes(q)
+        );
+      })
+    : allStudents;
+
+  // Per-panel pagination. usePagination clamps the active page when the
+  // filtered student count shrinks below it (e.g. after typing into
+  // the shared search input).
+  const { page, setPage, pageItems, pageCount } = usePagination(students);
+
+  const ui = segmentationRules.getGenderedUI({
+    role: "teacher",
+    segment: halaqah.segment,
+  });
+  const segmentKey =
+    halaqah.segment === "men"
+      ? "segment.men"
+      : halaqah.segment === "women"
+        ? "segment.women"
+        : "";
+
+  return (
+    <PageSection title={`${t(ui.halaqahLabel)} — ${halaqah.name}`}>
+      <Card padding="md" variant="bordered">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <span className="text-base text-muted">
+            {t("supervisor.halaqahName")}:
+          </span>
+          <span className="text-base font-medium text-foreground">
+            {halaqah.name}
+          </span>
+          {segmentKey && <Badge variant="secondary">{t(segmentKey)}</Badge>}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <SummaryStat
+            label={t("supervisor.summaryReports30")}
+            value={String(panel.reports30dTotal)}
+          />
+          <SummaryStat
+            label={t("supervisor.summaryActive")}
+            value={`${panel.engagedCount} / ${allStudents.length}`}
+          />
+          <SummaryStat
+            label={t("supervisor.summaryTopReporter")}
+            value={panel.topReporter?.name ?? t("supervisor.noneYet")}
+          />
+          <SummaryStat
+            label={t("supervisor.summaryNeedsAttention")}
+            value={String(panel.needsAttention)}
+            accent={panel.needsAttention > 0 ? "warning" : undefined}
+          />
+        </div>
+
+        {students.length === 0 ? (
+          <p className="text-sm text-muted">
+            {q ? t("admin.noSearchResults") : t("supervisor.noStudents")}
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-base">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-3 py-2 w-8" aria-hidden="true" />
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.studentName")}
+                    </th>
+                    {canSeeContact && (
+                      <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                        {t("student.contact")}
+                      </th>
+                    )}
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.consistency30")}
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.last7Days")}
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.memorizationPages")}
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.reviewPages")}
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.totalReports")}
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                      {t("supervisor.lastActivity")}
+                    </th>
+                    {canActivate && (
+                      <th className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap">
+                        {t("student.activation")}
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {pageItems.map((s) => {
+                    const expandKey = `${halaqah.id}:${s.id}`;
+                    const isOpen = expanded.has(expandKey);
+                    return (
+                      <FragmentRow
+                        key={s.id}
+                        student={s}
+                        isOpen={isOpen}
+                        expandKey={expandKey}
+                        onToggle={toggleExpanded}
+                        tierLabel={t(tierLabelKey(s.tier))}
+                        recencyLabel={formatRecency(s)}
+                        showContact={canSeeContact}
+                        showActivation={canActivate}
+                        activationLoadingId={activationLoadingId}
+                        onToggleActivation={handleToggleActivation}
+                        t={t}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+
+        <p className="text-sm text-muted mt-3">
+          {t(uiText.getStudentLabel(halaqah.segment, "plural"))}:{" "}
+          {allStudents.length}
+        </p>
+      </Card>
+    </PageSection>
+  );
+}
 
 function SummaryStat({
   label,

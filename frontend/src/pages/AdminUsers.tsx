@@ -18,7 +18,13 @@ import { Select } from '../components/atoms/Select';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { UsersIcon, TeacherIcon, CheckIcon } from '../components/atoms/Icon';
 import { MatchingBadge } from '../components/molecules/MatchingBadge';
-import { buildMatchIndex } from '../lib/matching';
+import { Pagination } from '../components/molecules/Pagination';
+import { buildMatchIndex, findMatches } from '../lib/matching';
+import {
+  autoAssignStudent,
+  createHalaqahsForTeacher,
+  type AutoAssignContext,
+} from '../lib/autoHalaqah';
 import { buildWhatsAppLink } from '../lib/utils';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -138,10 +144,21 @@ export function AdminUsers() {
   //                        because even a paused halaqah counts as "the
   //                        teacher is engaged" for triage purposes)
   //
-  // Both are derived from a single SELECT per source table on load.
+  // Both are derived from a single SELECT per source table on mount.
   // No N+1, no per-row queries.
   const [assignedStudentIds, setAssignedStudentIds] = useState<Set<string>>(new Set());
   const [teachersWithHalaqah, setTeachersWithHalaqah] = useState<Set<string>>(new Set());
+  // Server-side pagination state. The main user query fetches PAGE_SIZE
+  // rows at a time and returns the academy-wide total via
+  // `count: 'exact'` so the pager can render "Page X of N". The pool
+  // fetches above remain ONE-shot (on mount) — they're projected to
+  // just id/segment/age/available_times so the payload stays small
+  // even with hundreds of users, and the matching badges + "Has
+  // matches"/"Halaqah" filters keep working without re-fetching on
+  // every page click.
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   // Free-text search across the user's name, email, and phone. Applied
   // on top of the role/status/segment dropdown filters so all four can
   // narrow the list together.
@@ -186,96 +203,215 @@ export function AdminUsers() {
   };
 
   // ============================================
-  // Fetch Users
+  // Fetch Pools (mount-once)
   // ============================================
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  // Pools + assignment indexes feed every per-row badge and the
+  // "Has matches" / "Halaqah" filters. They're fetched ONCE per
+  // session and projected to the minimum columns needed — so the
+  // payload stays small even at academy scale and the filters keep
+  // working without re-fetching the whole world on every page click.
+  const fetchPools = useCallback(async () => {
     try {
-      const filterParams: { role?: string; status?: string } = {};
-      if (filters.role !== 'all') {
-        filterParams.role = filters.role;
-      }
-      if (filters.status !== 'all') {
-        filterParams.status = filters.status;
-      }
-
-      // Fetch the filtered list (drives the table) AND both full active
-      // pools (drive the matching badges) AND the two assignment
-      // indexes (drive the new "Assignment" filter). All parallel —
-      // no N+1, no per-row queries.
-      //
-      // halaqah_members: minimal projection (student_id only) since we
-      // only need the Set of assigned ids. Filtered to active
-      // memberships so a soft-suspended membership doesn't count.
-      //
-      // halaqahs: full list via the existing facade; we extract
-      // teacher_ids client-side. Any status counts — a paused halaqah
-      // still means the teacher is engaged, which is the triage signal
-      // an admin cares about ("who has nothing to do?").
-      const [usersRes, studentsRes, teachersRes, membershipsRes, halaqahsRes] =
+      const [studentsRes, teachersRes, membershipsRes, halaqahsRes] =
         await Promise.all([
-          db.profiles.getAll(filterParams),
-          db.profiles.getAll({ role: 'student', status: 'active' }),
-          db.profiles.getAll({ role: 'teacher', status: 'active' }),
+          // Projected select: just what the matching helpers need.
+          supabase
+            .from('profiles')
+            .select(
+              'id, first_name, second_name, third_name, email, segment, age, available_times',
+            )
+            .eq('role', 'student')
+            .eq('status', 'active'),
+          supabase
+            .from('profiles')
+            .select(
+              'id, first_name, second_name, third_name, email, segment, age, available_times',
+            )
+            .eq('role', 'teacher')
+            .eq('status', 'active'),
+          // halaqah_members: just student_id of active memberships.
           supabase
             .from('halaqah_members')
             .select('student_id')
             .eq('status', 'active'),
-          db.halaqahs.getAll({}),
+          // halaqahs: just teacher_id (any status, see note above).
+          supabase.from('halaqahs').select('teacher_id'),
         ]);
 
-      if (usersRes.error) {
-        console.error('Error fetching users:', usersRes.error);
-        toast.error(t('errors.generic'));
-        return;
-      }
+      setStudentsPool((studentsRes.data ?? []) as Profile[]);
+      setTeachersPool((teachersRes.data ?? []) as Profile[]);
 
-      // Filter out admin users from the list, then apply the segment filter
-      // client-side (kept here rather than pushed into the db facade to avoid
-      // re-touching the Supabase layer for this small addition).
-      const nonAdminUsers = (usersRes.data || []).filter((u) => u.role !== 'admin');
-      const afterSegment = filters.segment === 'all'
-        ? nonAdminUsers
-        : nonAdminUsers.filter((u) => u.segment === filters.segment);
-      setUsers(afterSegment);
-
-      // Pool fetches are best-effort. A failure leaves the badge counts
-      // empty rather than blocking the whole users table — the admin
-      // can still manage statuses / roles.
-      setStudentsPool(studentsRes.data ?? []);
-      setTeachersPool(teachersRes.data ?? []);
-
-      // Derive the two assignment indexes. Each is a Set for O(1)
-      // membership tests during the per-row filter pass below.
-      //
-      // halaqah_members rows where `student_id` is unexpectedly null
-      // (data corruption) are filtered out — Set never accepts a falsy
-      // id silently. Same for halaqahs without a teacher (unassigned
-      // halaqah is its own thing; doesn't make any teacher "engaged").
       const memberRows = (membershipsRes.data ?? []) as Array<{ student_id: string | null }>;
       setAssignedStudentIds(
         new Set(memberRows.map((m) => m.student_id).filter((id): id is string => !!id)),
       );
 
-      const halaqahsList = halaqahsRes.data ?? [];
+      const halaqahRows = (halaqahsRes.data ?? []) as Array<{ teacher_id: string | null }>;
       setTeachersWithHalaqah(
-        new Set(
-          halaqahsList
-            .map((h) => h.teacher_id)
-            .filter((id): id is string => !!id),
-        ),
+        new Set(halaqahRows.map((h) => h.teacher_id).filter((id): id is string => !!id)),
       );
+    } catch (err) {
+      console.error('Error fetching pools:', err);
+      // Best-effort: a failure leaves the badge counts empty but the
+      // main user table still works.
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchPools();
+  }, [fetchPools]);
+
+  // Pre-compute the id sets used by the matching/assignment FILTERS
+  // (not the per-row badges — those are derived separately further
+  // down). These run client-side from the projected pools so we can
+  // push the equivalent constraint into the server query via
+  // `.in()` / `.not('id', 'in', ...)` instead of fetching the whole
+  // table and filtering in memory.
+  const idsWithMatches = useMemo(() => {
+    const set = new Set<string>();
+    // A student "has matches" when at least one teacher pairs via
+    // segmentsCompatible + slot intersection (see lib/matching).
+    for (const s of studentsPool) {
+      if (findMatches(s, teachersPool).length > 0) set.add(s.id);
+    }
+    for (const tch of teachersPool) {
+      if (findMatches(tch, studentsPool).length > 0) set.add(tch.id);
+    }
+    return set;
+  }, [studentsPool, teachersPool]);
+
+  // ============================================
+  // Fetch Users (server-side paginated)
+  // ============================================
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Build the query incrementally. select('*', {count:'exact'})
+      // returns rows + an authoritative total — drives the pager.
+      // Same `any` cast as profilesApi.list: the generated UserRoleDb
+      // union is narrower than runtime UserRole (extended with
+      // halaqah_supervisor + supervisor_manager via 0009; types
+      // haven't been regenerated yet).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .neq('role', 'admin');
+
+      if (filters.role !== 'all') query = query.eq('role', filters.role);
+      if (filters.status !== 'all') query = query.eq('status', filters.status);
+      if (filters.segment !== 'all') query = query.eq('segment', filters.segment);
+
+      // Free-text search across the columns the admin would expect to
+      // search by. Sanitized of PostgREST-grammar chars so a comma or
+      // paren in the query doesn't fracture the .or() clause.
+      const q = searchQuery.trim().replace(/[%,()]/g, '');
+      if (q) {
+        query = query.or(
+          `first_name.ilike.%${q}%,` +
+            `second_name.ilike.%${q}%,` +
+            `third_name.ilike.%${q}%,` +
+            `email.ilike.%${q}%,` +
+            `phone.ilike.%${q}%`,
+        );
+      }
+
+      // Schedule-match filter: pass the precomputed id set.
+      // For 'none' we constrain to student/teacher rows because the
+      // matching concept doesn't apply to admin/supervisor rows.
+      if (filters.matching === 'has') {
+        const ids = Array.from(idsWithMatches);
+        if (ids.length === 0) {
+          // Empty set → no rows can match. Short-circuit to keep the
+          // query well-formed (PostgREST .in('id', '()') errors out).
+          setUsers([]);
+          setTotalCount(0);
+          return;
+        }
+        query = query.in('id', ids);
+      } else if (filters.matching === 'none') {
+        query = query.in('role', ['student', 'teacher']);
+        const ids = Array.from(idsWithMatches);
+        if (ids.length > 0) {
+          query = query.not('id', 'in', `(${ids.join(',')})`);
+        }
+      }
+
+      // Halaqah-assignment filter: union both role-specific sets so
+      // 'assigned' / 'unassigned' applies symmetrically to students
+      // and teachers without two separate queries.
+      const assignedIdsUnion = [
+        ...assignedStudentIds,
+        ...teachersWithHalaqah,
+      ];
+      if (filters.assignment === 'assigned') {
+        if (assignedIdsUnion.length === 0) {
+          setUsers([]);
+          setTotalCount(0);
+          return;
+        }
+        query = query.in('id', assignedIdsUnion);
+      } else if (filters.assignment === 'unassigned') {
+        query = query.in('role', ['student', 'teacher']);
+        if (assignedIdsUnion.length > 0) {
+          query = query.not(
+            'id',
+            'in',
+            `(${assignedIdsUnion.join(',')})`,
+          );
+        }
+      }
+
+      // Order + range. order() must come before range() in PostgREST.
+      query = query.order('created_at', { ascending: false });
+      const from = currentPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Error fetching users:', error);
+        toast.error(t('errors.generic'));
+        return;
+      }
+
+      setUsers((data ?? []) as Profile[]);
+      setTotalCount(count ?? 0);
     } catch (err) {
       console.error('Error fetching users:', err);
       toast.error(t('errors.generic'));
     } finally {
       setLoading(false);
     }
-  }, [filters, toast, t]);
+  }, [
+    filters,
+    searchQuery,
+    currentPage,
+    idsWithMatches,
+    assignedStudentIds,
+    teachersWithHalaqah,
+    toast,
+    t,
+  ]);
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, [fetchUsers]);
+
+  // Reset to page 0 whenever a filter or search query changes — so
+  // narrowing the dataset doesn't strand the user on a now-empty
+  // page index. fetchUsers re-runs on the page-state change.
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [
+    filters.role,
+    filters.status,
+    filters.segment,
+    filters.matching,
+    filters.assignment,
+    searchQuery,
+  ]);
 
   // ============================================
   // Update User Status
@@ -299,6 +435,21 @@ export function AdminUsers() {
       }
 
       toast.success(t('admin.userUpdated'));
+
+      // Activation automation. Triggers ONLY on transitions to
+      // 'active' — re-activating an already-active row is a no-op
+      // here, and suspension never spawns side-effects on halaqahs.
+      // The mutation logic lives in lib/autoHalaqah; this site just
+      // dispatches and surfaces the result.
+      if (newStatus === 'active') {
+        const target = users.find((u) => u.id === userId);
+        if (target?.role === 'teacher') {
+          await runTeacherActivationAutomation(target);
+        } else if (target?.role === 'student') {
+          await runStudentActivationAutomation(target);
+        }
+      }
+
       await fetchUsers();
       // Self-suspend by an admin/supervisor_manager: refresh own profile
       // so the centralized active-status guard signs them out
@@ -311,6 +462,116 @@ export function AdminUsers() {
       toast.error(t('errors.generic'));
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // Auto-create the teacher's halaqahs (one per declared time slot)
+  // then sweep the unassigned student pool, slotting each compatible
+  // student into the least-full new halaqah.
+  const runTeacherActivationAutomation = async (teacher: Profile) => {
+    const result = await createHalaqahsForTeacher(teacher);
+    if (result.failed.length > 0 && result.created.length === 0) {
+      toast.error(t('autoAssign.halaqahsCreateFailed'));
+      return;
+    }
+    if (result.created.length > 0) {
+      const name = [teacher.first_name, teacher.second_name]
+        .filter(Boolean)
+        .join(' ');
+      toast.success(
+        t('autoAssign.halaqahsCreated')
+          .replace('{{n}}', String(result.created.length))
+          .replace('{{name}}', name),
+      );
+    }
+    // Sweep unassigned students against the newly-available halaqahs.
+    // We fetch a fresh context every sweep so the member counts /
+    // assigned set reflect the inserts that just landed.
+    await sweepUnassignedStudents();
+  };
+
+  // Auto-assign a single student to the best-fitting halaqah.
+  const runStudentActivationAutomation = async (student: Profile) => {
+    const ctx = await loadAssignContext();
+    const result = await autoAssignStudent(student, ctx);
+    if (result.halaqah && result.membership) {
+      toast.success(
+        t('autoAssign.studentAssigned').replace(
+          '{{halaqah}}',
+          result.halaqah.name,
+        ),
+      );
+    } else if (result.reason === 'no_compatible_halaqah' || result.reason === 'no_slots') {
+      toast.warning(t('autoAssign.studentNoMatch'));
+    } else if (result.reason === 'add_failed') {
+      toast.error(t('errors.generic'));
+    }
+    // 'already_assigned' is silent — nothing changed and the admin
+    // doesn't need a toast for the no-op case.
+  };
+
+  // Pull the academy-wide context needed to rank halaqahs for any
+  // student: every active halaqah + the active-membership index.
+  const loadAssignContext = async (): Promise<AutoAssignContext> => {
+    const [halaqahsRes, membersRes] = await Promise.all([
+      db.halaqahs.getAll({ status: 'active' }),
+      supabase
+        .from('halaqah_members')
+        .select('halaqah_id, student_id')
+        .eq('status', 'active'),
+    ]);
+    const halaqahs = halaqahsRes.data ?? [];
+    const memberRows =
+      (membersRes.data ?? []) as Array<{ halaqah_id: string; student_id: string }>;
+    const memberCounts = new Map<string, number>();
+    const assignedStudentIds = new Set<string>();
+    for (const m of memberRows) {
+      memberCounts.set(m.halaqah_id, (memberCounts.get(m.halaqah_id) ?? 0) + 1);
+      assignedStudentIds.add(m.student_id);
+    }
+    return { halaqahs, memberCounts, assignedStudentIds };
+  };
+
+  // Walk every active, unassigned student and try to slot them into
+  // the best halaqah. Called after a teacher is activated so newly
+  // created halaqahs immediately pick up the waitlist.
+  const sweepUnassignedStudents = async () => {
+    const ctx = await loadAssignContext();
+    // Pull every active student in one paginated-friendly query —
+    // they're the candidates for the sweep. Limit to status='active'
+    // because we only want already-vetted students to land in a
+    // halaqah; pending students stay where they are.
+    const { data: candidates } = await db.profiles.getAll({
+      role: 'student',
+      status: 'active',
+    });
+    let assigned = 0;
+    // Mutable copies of the maps so each successful insert updates
+    // the load-balance signal for the next iteration.
+    const memberCounts = new Map(ctx.memberCounts);
+    const assignedStudentIds = new Set(ctx.assignedStudentIds);
+    for (const student of candidates ?? []) {
+      if (assignedStudentIds.has(student.id)) continue;
+      const result = await autoAssignStudent(student, {
+        halaqahs: ctx.halaqahs,
+        memberCounts,
+        assignedStudentIds,
+      });
+      if (result.halaqah && result.membership) {
+        memberCounts.set(
+          result.halaqah.id,
+          (memberCounts.get(result.halaqah.id) ?? 0) + 1,
+        );
+        assignedStudentIds.add(student.id);
+        assigned += 1;
+      }
+    }
+    if (assigned > 0) {
+      toast.success(
+        t('autoAssign.scanCompletedAssigned').replace('{{n}}', String(assigned)),
+      );
+    } else {
+      toast.info(t('autoAssign.scanCompletedNone'));
     }
   };
 
@@ -367,14 +628,6 @@ export function AdminUsers() {
     return parts.join(' ') || user.email;
   };
 
-  // Full three-part name + email, used ONLY by the search filter so the
-  // admin can still find a user by middle/family name or email even
-  // though those columns are no longer rendered in the table.
-  const getSearchHaystack = (user: Profile): string =>
-    [user.first_name, user.second_name, user.third_name, user.email]
-      .filter(Boolean)
-      .join(' ');
-
   // ============================================
   // Calculate Stats
   // ============================================
@@ -409,54 +662,14 @@ export function AdminUsers() {
     [studentMatches, teacherMatches],
   );
 
-  // Apply the free-text search + matching filter on top of the
-  // role/status/segment filters already baked into `users`. Stats above
-  // stay against the filter-only list so the summary cards reflect
-  // "matches in this filter selection", not "matches in this query".
-  const visibleUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return users.filter((u) => {
-      if (q) {
-        // Search across the full three-part name + email + phone, not the
-        // shortened display name — so admins can still find someone by
-        // their middle/family name or email even though those columns
-        // are no longer rendered.
-        const haystack = getSearchHaystack(u).toLowerCase();
-        const phone = (u.phone || '').toLowerCase();
-        if (!(haystack.includes(q) || phone.includes(q))) {
-          return false;
-        }
-      }
-      if (filters.matching !== 'all') {
-        const hasMatches = matchesFor(u).length > 0;
-        if (filters.matching === 'has' && !hasMatches) return false;
-        if (filters.matching === 'none' && hasMatches) return false;
-      }
-      if (filters.assignment !== 'all') {
-        // Role-aware test: a student is "assigned" iff they appear in an
-        // active membership; a teacher is "assigned" iff they own any
-        // halaqah. The filter is silently a no-op for other roles —
-        // assignment isn't meaningful for an admin or a supervisor, so
-        // a non-student-non-teacher row passes through regardless.
-        let isAssigned: boolean | null = null;
-        if (u.role === 'student') isAssigned = assignedStudentIds.has(u.id);
-        else if (u.role === 'teacher') isAssigned = teachersWithHalaqah.has(u.id);
-        if (isAssigned !== null) {
-          if (filters.assignment === 'assigned' && !isAssigned) return false;
-          if (filters.assignment === 'unassigned' && isAssigned) return false;
-        }
-      }
-      return true;
-    });
-  }, [
-    users,
-    searchQuery,
-    filters.matching,
-    filters.assignment,
-    matchesFor,
-    assignedStudentIds,
-    teachersWithHalaqah,
-  ]);
+  // All filtering — role/status/segment/search/matching/assignment —
+  // now happens server-side in `fetchUsers`. `users` is already the
+  // current page (≤ PAGE_SIZE rows) so we don't run a second filter
+  // pass here. The variables below give the JSX the same names it
+  // used during the client-side era to keep the diff minimal.
+  const visibleUsers = users; // for select-all / counter semantics
+  const pagedUsers = users; // for the table body
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // ============================================
   // Filter Options
@@ -653,7 +866,7 @@ export function AdminUsers() {
                 </tr>
               </thead>
               <tbody className={styles.tableBody}>
-                {visibleUsers.map((user) => (
+                {pagedUsers.map((user) => (
                   <tr
                     key={user.id}
                     className={`${styles.tableRow} cursor-pointer`}
@@ -819,6 +1032,11 @@ export function AdminUsers() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
       </PageSection>

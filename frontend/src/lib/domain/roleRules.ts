@@ -188,9 +188,24 @@ export function canStudentJoinHalaqah(
   if (hSeg === sSeg) return true;
 
   // Children bridge across segments when the halaqah accepts children.
+  // Gender carve-out per spec:
+  //   - male child   (segment='men')      → may join either men or women halaqah
+  //   - female child (segment='women')    → MUST stay on a women halaqah; a men
+  //                                         halaqah is blocked even if it
+  //                                         accepts children
+  //   - unknown-gender child (segment='children') → permissive on either side
+  // Non-child students never bridge — gender separation is absolute.
   if (student.student_type === 'child') {
     const audience = halaqah.target_audience;
-    return audience === AudienceType.CHILDREN || audience === AudienceType.BOTH;
+    if (audience !== AudienceType.CHILDREN && audience !== AudienceType.BOTH) {
+      return false;
+    }
+    // The only cross-gender pair the spec forbids is "female child → men's
+    // halaqah". Everything else inside the children band is allowed.
+    if (sSeg === UserSegment.WOMEN && hSeg === UserSegment.MEN) {
+      return false;
+    }
+    return true;
   }
 
   return false;

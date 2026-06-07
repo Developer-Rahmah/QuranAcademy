@@ -15,10 +15,13 @@ import { Card, CardContent } from '../components/molecules/Card';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { Button } from '../components/atoms/Button';
 import { ProgressBar } from '../components/atoms/ProgressBar';
-import { api, db } from '../lib/supabase';
+import { api } from '../lib/supabase';
+import { supabase } from '../lib/supabase/client';
 import { useTranslation } from '../locales/i18n';
 import { ROUTES, adminUserDetailPath } from '../lib/routes';
 import { MatchingBadge } from '../components/molecules/MatchingBadge';
+import { WhatsAppMessageDialog } from '../components/molecules/WhatsAppMessageDialog';
+import { WhatsappIcon } from '../components/atoms/Icon';
 import { findMatches } from '../lib/matching';
 import { TOTAL_QURAN_PAGES, ACADEMY_TIMEZONE, recitationLabelKeyFor } from '../lib/constants';
 import { formatSlotRange } from '../lib/time';
@@ -169,6 +172,10 @@ export function AdminUserDetail() {
   // the subject's `available_times` to surface compatible pairings.
   const [oppositePool, setOppositePool] = useState<Profile[]>([]);
 
+  // WhatsApp confirmation dialog. Opened from the action row; pre-fills
+  // the localStorage-saved template (or the built-in default).
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -189,21 +196,36 @@ export function AdminUserDetail() {
           api.reports.byStudent(p.id, 20),
           api.reports.stats.studentProgress(p.id),
           // Opposite-side pool drives the matching section below.
-          db.profiles.getAll({ role: 'teacher', status: 'active' }),
+          // Projected select — only the columns the matching helpers
+          // and the popover need. Keeps payload light as the academy
+          // grows (full Profile row was ~5x heavier per record).
+          supabase
+            .from('profiles')
+            .select(
+              'id, first_name, second_name, third_name, email, segment, age, available_times',
+            )
+            .eq('role', 'teacher')
+            .eq('status', 'active'),
         ]);
         if (cancelled) return;
         setMembership(m.data);
         setReports(r.data ?? []);
         setProgress(pr.data);
-        setOppositePool(pool.data ?? []);
+        setOppositePool(((pool as { data?: Profile[] | null }).data ?? []) as Profile[]);
       } else if (p.role === 'teacher') {
         const [{ data }, pool] = await Promise.all([
           api.halaqah.list({ teacherId: p.id }),
-          db.profiles.getAll({ role: 'student', status: 'active' }),
+          supabase
+            .from('profiles')
+            .select(
+              'id, first_name, second_name, third_name, email, segment, age, available_times',
+            )
+            .eq('role', 'student')
+            .eq('status', 'active'),
         ]);
         if (cancelled) return;
         setHalaqahs(data ?? []);
-        setOppositePool(pool.data ?? []);
+        setOppositePool(((pool as { data?: Profile[] | null }).data ?? []) as Profile[]);
       }
       setLoading(false);
     };
@@ -271,11 +293,23 @@ export function AdminUserDetail() {
             </div>
           </div>
         </div>
-        <Link to={ROUTES.adminUsers} className="self-start">
-          <Button variant="outline" size="sm">
-            {t('userDetail.backToList')}
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-start gap-2 self-start">
+          {profile.phone && (
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => setWhatsappOpen(true)}
+            >
+              <WhatsappIcon className="w-4 h-4" />
+              {t('whatsapp.sendConfirmation')}
+            </Button>
+          )}
+          <Link to={ROUTES.adminUsers}>
+            <Button variant="outline" size="sm">
+              {t('userDetail.backToList')}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ---------- Personal + Contact (side-by-side on wide screens) --- */}
@@ -386,14 +420,40 @@ export function AdminUserDetail() {
               <CardContent className="p-6">
                 {membership?.halaqah ? (
                   <>
-                    <InfoRow label={t('halaqah.halaqahName')} value={membership.halaqah.name} />
+                    <InfoRow
+                      label={t('halaqah.halaqahName')}
+                      value={
+                        // Clickable: navigates to the halaqah detail
+                        // page so the admin can drill straight into
+                        // the student's current placement.
+                        <Link
+                          to={`/halaqah/${membership.halaqah.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {membership.halaqah.name}
+                        </Link>
+                      }
+                    />
                     <InfoRow
                       label={t('halaqah.teacherName')}
-                      value={
-                        membership.halaqah.teacher
-                          ? `${membership.halaqah.teacher.first_name} ${membership.halaqah.teacher.second_name}`
-                          : t('userDetail.notAssigned')
-                      }
+                      value={(() => {
+                        const teacher = membership.halaqah.teacher;
+                        if (!teacher) return t('userDetail.notAssigned');
+                        const name = [teacher.first_name, teacher.second_name]
+                          .filter(Boolean)
+                          .join(' ');
+                        // Teacher name also clickable — drops the
+                        // admin into the teacher's profile so they
+                        // can see their schedule + other halaqahs.
+                        return (
+                          <Link
+                            to={adminUserDetailPath(teacher.id)}
+                            className="text-primary hover:underline"
+                          >
+                            {name}
+                          </Link>
+                        );
+                      })()}
                     />
                     <InfoRow
                       label={t('recitation.currentRecitation')}
@@ -523,6 +583,13 @@ export function AdminUserDetail() {
           </PageSection>
         </>
       )}
+
+      <WhatsAppMessageDialog
+        isOpen={whatsappOpen}
+        onClose={() => setWhatsappOpen(false)}
+        phone={profile.phone}
+        name={getDisplayName(profile)}
+      />
     </DashboardLayout>
   );
 }

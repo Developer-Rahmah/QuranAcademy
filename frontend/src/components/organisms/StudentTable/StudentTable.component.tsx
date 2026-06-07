@@ -10,6 +10,8 @@ import { Badge } from '../../atoms/Badge';
 import { Input } from '../../atoms/Input';
 import { ProgressBar } from '../../atoms/ProgressBar';
 import { DocumentIcon } from '../../atoms/Icon';
+import { Pagination } from '../../molecules/Pagination';
+import { usePagination } from '../../../hooks/usePagination';
 import { getDisplayName, getFullName, buildWhatsAppLink } from '../../../lib/utils';
 import { uiText } from '../../../lib/uiText';
 import { studentTableStyles, studentCardStyles } from './StudentTable.style';
@@ -52,6 +54,12 @@ export function StudentTable({
       );
     });
   }, [students, query, searchable]);
+
+  // Paginate the FILTERED list, not the raw `students` prop — so search
+  // and pagination compose: typing into the search narrows the dataset,
+  // and `usePagination` clamps the page to a valid value after the
+  // filter shrinks it (see the effect inside the hook).
+  const { page, setPage, pageItems, pageCount } = usePagination(filtered);
 
   const searchBar = searchable && students.length > 0 ? (
     <div className="mb-3">
@@ -123,7 +131,7 @@ export function StudentTable({
             </tr>
           </thead>
           <tbody className={studentTableStyles.tbody}>
-            {filtered.map((student, index) => (
+            {pageItems.map((student, index) => (
               <tr
                 key={student.id}
                 className={index % 2 === 0 ? studentTableStyles.bodyRowEven : studentTableStyles.bodyRowOdd}
@@ -236,6 +244,7 @@ export function StudentTable({
         </table>
       </div>
     </Card>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </div>
   );
 }
