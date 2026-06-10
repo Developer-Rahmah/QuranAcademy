@@ -17,6 +17,7 @@ import { StatCard, StatCardRow } from "../components/molecules/StatCard";
 import { MeetLinkCard } from "../components/molecules/MeetLinkCard";
 import { DashboardViewSwitcher } from "../components/molecules/DashboardViewSwitcher";
 import { ConfirmDialog } from "../components/molecules/ConfirmDialog";
+import { ShareReportDialog } from "../components/molecules/ShareReportDialog";
 import { Button } from "../components/atoms/Button";
 import { SaveIcon, RefreshIcon, PlusIcon } from "../components/atoms/Icon";
 import { getDisplayName } from "../lib/utils";
@@ -24,6 +25,11 @@ import { getErrorMessage } from "../lib/errorHandler";
 import { TOTAL_QURAN_PAGES } from "../lib/constants";
 import { useTranslation } from "../locales/i18n";
 import { uiText } from "../lib/uiText";
+import {
+  formatReportForSharing,
+  shareReportViaWhatsapp,
+} from "../lib/reportSharing";
+import { useSettings } from "../context/SettingsContext";
 import { ReportList } from "@/components/organisms";
 import type { ReportWithItems } from "@/components/organisms";
 
@@ -35,6 +41,7 @@ export function StudentDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
   const { profile } = useAuth();
+  const { academyName } = useSettings();
   const { halaqah, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
   const {
     reports,
@@ -50,10 +57,58 @@ export function StudentDashboard() {
     null,
   );
 
+  // Share preview dialog state. The dashboard's per-row share now
+  // routes through the same preview surface the ReportForm uses, so
+  // the message format and the editable affordance are identical
+  // across the two entry points.
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareDraftText, setShareDraftText] = useState('');
+  const [sharing, setSharing] = useState(false);
+
   const isLoading = loadingHalaqah || loadingReports || loadingProgress;
 
   const handleEdit = (report: ReportWithItems) => {
     navigate(`/report/${report.id}/edit`);
+  };
+
+  // Open the share preview for a saved report. The dialog's confirm
+  // handler dispatches the share — the report itself is already
+  // persisted at this point (the dashboard list only shows saved
+  // rows), so there's no save step to chain.
+  const handleShare = (report: ReportWithItems) => {
+    const text = formatReportForSharing(report, {
+      studentName: profile ? getDisplayName(profile) : '',
+      halaqahName: halaqah?.name,
+      academyName,
+    });
+    setShareDraftText(text);
+    setShareDialogOpen(true);
+  };
+
+  const handleShareConfirm = async (text: string) => {
+    setSharing(true);
+    try {
+      const outcome = await shareReportViaWhatsapp({
+        text,
+        halaqahLink: halaqah?.meet_link,
+      });
+      switch (outcome) {
+        case 'shared':
+          break;
+        case 'copied_and_opened':
+          toast.success(t('report.shareCopiedAndOpened'));
+          break;
+        case 'copied':
+          toast.info(t('report.shareCopiedNoLink'));
+          break;
+        case 'unavailable':
+          toast.error(t('report.shareUnavailable'));
+          break;
+      }
+      setShareDialogOpen(false);
+    } finally {
+      setSharing(false);
+    }
   };
 
   const handleDeleteRequest = (report: ReportWithItems) => {
@@ -161,6 +216,10 @@ export function StudentDashboard() {
               loading={loadingReports}
               onEdit={handleEdit}
               onDelete={handleDeleteRequest}
+              // Share button is offered only when the halaqah carries
+              // a WhatsApp group link (or any link) — otherwise the
+              // student has nowhere to send the message.
+              onShare={halaqah?.meet_link ? handleShare : undefined}
             />
           </PageSection>
         </div>
@@ -174,6 +233,13 @@ export function StudentDashboard() {
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         loading={deleting}
+      />
+      <ShareReportDialog
+        isOpen={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        defaultText={shareDraftText}
+        onSend={handleShareConfirm}
+        loading={sharing}
       />
     </DashboardLayout>
   );

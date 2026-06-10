@@ -13,6 +13,7 @@
 import { useState, useMemo, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import { useSettings } from '../../../context/SettingsContext';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
 import { useCreateReport, useUpdateReport } from '../../../hooks/useReports';
@@ -21,15 +22,21 @@ import { Button } from '../../atoms/Button';
 import { Select } from '../../atoms/Select';
 import { Input } from '../../atoms/Input';
 import { Card, CardContent } from '../../molecules/Card';
-import { PlusIcon, SaveIcon, RefreshIcon } from '../../atoms/Icon';
+import { ShareReportDialog } from '../../molecules/ShareReportDialog';
+import { PlusIcon, SaveIcon, RefreshIcon, WhatsappIcon } from '../../atoms/Icon';
 import { SURAHS, REPORT_TYPES, MIN_PAGES } from '../../../lib/constants';
 import {
   cn,
+  getDisplayName,
   getTodayLocalDate,
   validatePages,
   generateId,
 } from '../../../lib/utils';
 import { getErrorMessage } from '../../../lib/errorHandler';
+import {
+  formatReportForSharing,
+  shareReportViaWhatsapp,
+} from '../../../lib/reportSharing';
 import { reportFormStyles } from './ReportForm.style';
 import type { ReportItem, FormErrors, ReportFormProps } from './ReportForm.types';
 import type { ReportType, ReportItem as DomainReportItem } from '../../../types';
@@ -55,12 +62,20 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const { profile } = useAuth();
+  const { academyName } = useSettings();
   const { membership, loading: loadingHalaqah } = useStudentHalaqah(profile?.id);
   const { createReport, loading: creating } = useCreateReport();
   const { updateReport, loading: updating } = useUpdateReport();
 
   const isEditMode = !!report;
   const submitting = creating || updating;
+
+  // Share-preview dialog state. The dialog opens AFTER validation
+  // succeeds but BEFORE the save lands; clicking Send inside the
+  // dialog runs the atomic save-then-share flow.
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareDraftText, setShareDraftText] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   // Form state.
   //
@@ -217,22 +232,24 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
   // ============================================
   // Submit Handler
   // ============================================
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  // Shared preparation: validates the form, checks auth + halaqah,
+  // and returns the canonical item list. Returns null when something
+  // failed (toast already raised) so callers can short-circuit.
+  const prepareSubmission = ():
+    | Array<{ surah_name: string; pages: number; type: ReportType }>
+    | null => {
     setSubmitError('');
 
-    // Validate form
     if (!validate()) {
       toast.warning(t('validation.fixErrors'));
-      return;
+      return null;
     }
 
-    // CRITICAL: Check profile and membership exist
     if (!profile?.id) {
       const errorMsg = t('errors.notAuthenticated');
       setSubmitError(errorMsg);
       toast.error(errorMsg);
-      return;
+      return null;
     }
 
     // Edit mode reuses the report's existing halaqah_id, so a student
@@ -243,11 +260,10 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
       const errorMsg = t('errors.noHalaqah');
       setSubmitError(errorMsg);
       toast.error(errorMsg);
-      return;
+      return null;
     }
 
-    // Prepare items
-    const items = [
+    return [
       ...memorizationItems
         .filter((item) => item.surah_name && item.pages)
         .map((item) => ({
@@ -263,7 +279,13 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
           type: REPORT_TYPES.REVIEW as ReportType,
         })),
     ];
+  };
 
+  // Performs the actual DB write. Returns true on success so the
+  // caller can decide whether to also trigger the share flow.
+  const performSave = async (
+    items: Array<{ surah_name: string; pages: number; type: ReportType }>,
+  ): Promise<boolean> => {
     if (isEditMode && report) {
       const { error } = await updateReport(
         report.id,
@@ -274,32 +296,117 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
         const errorMsg = getErrorMessage(error);
         setSubmitError(errorMsg);
         toast.error(errorMsg);
-        return;
+        return false;
       }
-      toast.success(t('report.updateSuccess'));
-      navigate('/dashboard');
-      return;
+      return true;
     }
 
-    // Create flow
     const { error } = await createReport(
       {
-        student_id: profile.id,
+        student_id: profile!.id,
         halaqah_id: membership!.halaqah_id,
         report_date: reportDate,
       },
-      items
+      items,
     );
-
     if (error) {
       const errorMsg = getErrorMessage(error);
       setSubmitError(errorMsg);
       toast.error(errorMsg);
-      return;
+      return false;
     }
+    return true;
+  };
 
-    toast.success(t('report.submitSuccess'));
+  // Existing "Save only" button path — keeps the original behaviour
+  // intact for users who don't want to share.
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const items = prepareSubmission();
+    if (!items) return;
+    const ok = await performSave(items);
+    if (!ok) return;
+    toast.success(t(isEditMode ? 'report.updateSuccess' : 'report.submitSuccess'));
     navigate('/dashboard');
+  };
+
+  // Primary "Send via WhatsApp" path. Validates the form first, then
+  // opens the preview dialog with the formatted message pre-filled.
+  // The actual save + share happens when the admin confirms inside
+  // the dialog (handleShareConfirm).
+  const handleOpenShareDialog = () => {
+    const items = prepareSubmission();
+    if (!items) return;
+    // Build a transient report shape from the in-form data so the
+    // formatter can produce the preview — `id` doesn't matter here,
+    // we never persist this transient object.
+    const previewReport = {
+      id: '',
+      student_id: profile?.id ?? '',
+      halaqah_id: membership?.halaqah_id ?? '',
+      report_date: reportDate,
+      notes: '',
+      created_at: '',
+      updated_at: '',
+      items: items.map((it, idx) => ({
+        id: `tmp-${idx}`,
+        report_id: '',
+        surah_name: it.surah_name,
+        pages: it.pages,
+        type: it.type,
+        created_at: '',
+        updated_at: '',
+      })),
+    };
+    const studentName = profile ? getDisplayName(profile) : '';
+    const text = formatReportForSharing(previewReport, {
+      studentName,
+      halaqahName: membership?.halaqah?.name,
+      academyName,
+    });
+    setShareDraftText(text);
+    setShareDialogOpen(true);
+  };
+
+  // Atomic "save then share" — the dialog's confirm handler. Both
+  // succeed → toast + navigate; save fails → keep the dialog open so
+  // the admin can retry without losing the draft.
+  const handleShareConfirm = async (text: string) => {
+    const items = prepareSubmission();
+    if (!items) return;
+    setSharing(true);
+    try {
+      const saved = await performSave(items);
+      if (!saved) return;
+
+      const outcome = await shareReportViaWhatsapp({
+        text,
+        halaqahLink: membership?.halaqah?.meet_link,
+      });
+      // The save already succeeded — surface the save toast first
+      // (it's the primary success signal) and the share outcome
+      // second (informational, since the share path is best-effort).
+      toast.success(
+        t(isEditMode ? 'report.updateSuccess' : 'report.submitSuccess'),
+      );
+      switch (outcome) {
+        case 'shared':
+          break;
+        case 'copied_and_opened':
+          toast.info(t('report.shareCopiedAndOpened'));
+          break;
+        case 'copied':
+          toast.info(t('report.shareCopiedNoLink'));
+          break;
+        case 'unavailable':
+          toast.warning(t('report.shareUnavailable'));
+          break;
+      }
+      setShareDialogOpen(false);
+      navigate('/dashboard');
+    } finally {
+      setSharing(false);
+    }
   };
 
   // ============================================
@@ -469,15 +576,34 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
+      {/* Action Buttons.
+          Create flow: WhatsApp share is the PRIMARY action (most
+          students share to their halaqah group); "Save only" is the
+          secondary path for those who don't want to share. Edit flow
+          keeps the existing single Save button — the share is offered
+          per-row on the dashboard for any saved report. */}
       <div className={reportFormStyles.actions.wrapper}>
+        {!isEditMode && (
+          <Button
+            type="button"
+            size="lg"
+            variant="success"
+            onClick={handleOpenShareDialog}
+            loading={submitting || sharing}
+            className={reportFormStyles.actions.submit}
+          >
+            <WhatsappIcon className="w-5 h-5" />
+            {t('report.sendViaWhatsapp')}
+          </Button>
+        )}
         <Button
           type="submit"
           size="lg"
+          variant={isEditMode ? 'primary' : 'outline'}
           loading={submitting}
           className={reportFormStyles.actions.submit}
         >
-          {isEditMode ? t('report.saveChanges') : t('report.submitReport')}
+          {isEditMode ? t('report.saveChanges') : t('report.saveOnly')}
         </Button>
         <Button
           type="button"
@@ -488,6 +614,14 @@ export function ReportForm({ className, report = null }: ReportFormProps) {
           {t('common.cancel')}
         </Button>
       </div>
+
+      <ShareReportDialog
+        isOpen={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        defaultText={shareDraftText}
+        onSend={handleShareConfirm}
+        loading={sharing || submitting}
+      />
     </form>
   );
 }

@@ -11,7 +11,7 @@
 import { useTranslation } from '../../../locales/i18n';
 import { Card } from '../../molecules/Card';
 import { Badge } from '../../atoms/Badge';
-import { CalendarIcon, EditIcon, TrashIcon } from '../../atoms/Icon';
+import { CalendarIcon, EditIcon, TrashIcon, WhatsappIcon } from '../../atoms/Icon';
 import { REPORT_TYPES } from '../../../lib/constants';
 import { reportListStyles, reportCardStyles, reportSummaryStyles } from './ReportList.style';
 import type { ReportListProps, ReportCardProps, ReportSummaryProps } from './ReportList.types';
@@ -24,6 +24,7 @@ export function ReportList({
   loading = false,
   onEdit,
   onDelete,
+  onShare,
 }: ReportListProps) {
   const { t } = useTranslation();
 
@@ -53,6 +54,7 @@ export function ReportList({
           report={report}
           onEdit={onEdit}
           onDelete={onDelete}
+          onShare={onShare}
         />
       ))}
     </div>
@@ -62,7 +64,7 @@ export function ReportList({
 /**
  * ReportCard - Single report card with items
  */
-export function ReportCard({ report, onEdit, onDelete }: ReportCardProps) {
+export function ReportCard({ report, onEdit, onDelete, onShare }: ReportCardProps) {
   const { t } = useTranslation();
 
   const memorizationItems =
@@ -79,7 +81,7 @@ export function ReportCard({ report, onEdit, onDelete }: ReportCardProps) {
     0
   );
 
-  const showActions = !!onEdit || !!onDelete;
+  const showActions = !!onEdit || !!onDelete || !!onShare;
 
   return (
     <Card padding="md">
@@ -115,6 +117,20 @@ export function ReportCard({ report, onEdit, onDelete }: ReportCardProps) {
 
       {showActions && (
         <div className={reportCardStyles.actions.wrapper}>
+          {onShare && (
+            <button
+              type="button"
+              onClick={() => onShare(report)}
+              // Lean on the existing action-button shape but tint the
+              // share affordance in WhatsApp-brand green so it reads
+              // as the primary post-save call-to-action.
+              className={`${reportCardStyles.actions.button} text-success hover:bg-success/10`}
+              aria-label={t('report.share')}
+            >
+              <WhatsappIcon className={reportCardStyles.actions.icon} />
+              <span>{t('report.share')}</span>
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"
