@@ -37,17 +37,22 @@ import {
   TeacherIcon,
   BookIcon,
   PlusIcon,
+  RefreshIcon,
 } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { ROUTES } from '../lib/routes';
 import { canManageSettings } from '../lib/permissions';
 import { TOTAL_QURAN_PAGES } from '../lib/constants';
+import { runAssignmentSweep } from '../lib/autoHalaqah';
 import type { Halaqah, HalaqahWithStats } from '../types';
 
 const PAGE_SIZE = 8;
 
 export function AdminDashboard() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { profile } = useAuth();
   const { stats, loading: loadingStats, refetch: refetchStats } =
     useAcademyStats();
@@ -73,6 +78,11 @@ export function AdminDashboard() {
   const [pageHalaqahs, setPageHalaqahs] = useState<HalaqahWithStats[]>([]);
   const [loadingPage, setLoadingPage] = useState(true);
   const [showHalaqahForm, setShowHalaqahForm] = useState(false);
+  // Sweep state. Re-running the matching sweep walks every active
+  // unassigned student and tries to place them — useful after the
+  // admin backfills `schedule.slot` on older halaqahs so newly-
+  // visible slots immediately pick up their waiting students.
+  const [sweeping, setSweeping] = useState(false);
 
   // -------- aggregate maps (mount-only) --------------------------------
   // membersByHalaqah[halaqahId] → number of distinct active members.
@@ -85,6 +95,10 @@ export function AdminDashboard() {
   const [memoByHalaqah, setMemoByHalaqah] = useState<Map<string, number>>(
     new Map(),
   );
+  // Distinct students with at least one active membership. Combined
+  // with `stats.totalStudents` below it gives us the academy-wide
+  // "unassigned students" count for the new dashboard card.
+  const [assignedStudentCount, setAssignedStudentCount] = useState(0);
   const [aggregatesLoaded, setAggregatesLoaded] = useState(false);
 
   const fetchAggregates = useCallback(async () => {
@@ -109,10 +123,13 @@ export function AdminDashboard() {
       const members =
         (membersRes.data ?? []) as Array<{ halaqah_id: string; student_id: string }>;
       const counts = new Map<string, number>();
+      const distinctStudents = new Set<string>();
       for (const m of members) {
         counts.set(m.halaqah_id, (counts.get(m.halaqah_id) ?? 0) + 1);
+        if (m.student_id) distinctStudents.add(m.student_id);
       }
       setMembersByHalaqah(counts);
+      setAssignedStudentCount(distinctStudents.size);
 
       const items = (itemsRes.data ?? []) as Array<{
         pages: number | string;
@@ -226,7 +243,34 @@ export function AdminDashboard() {
   }, [memoByHalaqah, membersByHalaqah]);
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  // Derived: students with no active membership. Clamped at 0 in
+  // case `assignedStudentCount` briefly exceeds totalStudents during
+  // an in-flight refetch.
+  const unassignedCount = Math.max(
+    0,
+    stats.totalStudents - assignedStudentCount,
+  );
   const isInitialLoading = loadingStats || (loadingPage && !aggregatesLoaded);
+
+  // Re-run the academy-wide assignment sweep. Triggered manually
+  // (button below) AND automatically by the teacher-activation flow
+  // in AdminUsers — both call the same shared helper. After the
+  // sweep, refresh the dashboard aggregates so the unassigned count
+  // and per-row student counts reflect the just-placed members.
+  const handleRunSweep = async () => {
+    setSweeping(true);
+    try {
+      const result = await runAssignmentSweep();
+      toast.success(
+        t('admin.sweepCompleted')
+          .replace('{{assigned}}', String(result.assigned))
+          .replace('{{unmatched}}', String(result.unmatched)),
+      );
+      await Promise.all([fetchAggregates(), fetchPage()]);
+    } finally {
+      setSweeping(false);
+    }
+  };
 
   return (
     <DashboardLayout
@@ -264,6 +308,39 @@ export function AdminDashboard() {
             />
           </StatCardRow>
 
+          {/* Unassigned students banner — surfaces the academy-wide
+              gap so the admin always knows who's waiting for a slot.
+              Hidden when there's nothing to surface AND no halaqahs
+              with missing slots could plausibly help. */}
+          {unassignedCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/5 p-4">
+              <p className="text-sm font-semibold text-foreground">
+                {t('admin.unassignedStudents')}: {unassignedCount}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Primary path is now the Matching Center — admins
+                    see WHY each student is unmatched + can preview
+                    before running the sweep. The direct "sweep"
+                    button stays as the fast path for batches that
+                    don't need triage. */}
+                <Link to={ROUTES.adminMatching}>
+                  <Button size="sm" variant="primary">
+                    {t('matching.openCenter')}
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRunSweep}
+                  loading={sweeping}
+                >
+                  <RefreshIcon className="w-4 h-4" />
+                  {t('admin.sweepUnassigned')}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-4">
             <Button size="lg" onClick={() => setShowHalaqahForm(true)}>
@@ -274,6 +351,12 @@ export function AdminDashboard() {
               <Button size="lg" variant="outline">
                 <UsersIcon className="w-5 h-5" />
                 {t('admin.viewUsers')}
+              </Button>
+            </Link>
+            <Link to={ROUTES.adminMatching}>
+              <Button size="lg" variant="outline">
+                <RefreshIcon className="w-5 h-5" />
+                {t('matching.openCenter')}
               </Button>
             </Link>
             {canManageSettings(profile?.role) && (

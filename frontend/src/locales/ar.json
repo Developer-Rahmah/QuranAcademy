@@ -688,6 +688,17 @@
     "teacherRequired": "يجب اختيار المعلمة",
     "level": "المستوى",
     "targetAudience": "الفئة المستهدفة",
+    "timeSlotLabel": "الوقت الأسبوعي",
+    "timeSlotNone": "غير محدد",
+    "timeSlotHint": "اختر الوقت الأسبوعي للحلقة. يستخدمه نظام التعيين التلقائي لمطابقة الطلاب الذين أتاحوا هذا الوقت.",
+    "missingTimeSlotTitle": "لم يتم تحديد وقت الحلقة",
+    "missingTimeSlotBody": "لا يستطيع نظام التعيين التلقائي مطابقة الطلاب بهذه الحلقة قبل تحديد الوقت. اختر الوقت أدناه واحفظ لاستكمال البيانات.",
+    "saveSlot": "حفظ الوقت",
+    "slotSaved": "تم حفظ وقت الحلقة",
+    "sweepUnassigned": "إعادة تشغيل التعيين التلقائي",
+    "sweepCompleted": "اكتمل التعيين — تم تعيين {{assigned}}، وبقي {{unmatched}} دون حلقة",
+    "unassignedStudents": "طلاب دون حلقة",
+    "viewUnassigned": "عرض الطلاب",
     "manageStudents": "إدارة الطلبة",
     "assignedStudents": "الطلبة المسجلات",
     "availableStudents": "الطلبة المتاحات",
@@ -717,7 +728,58 @@
     "matchesCount": "{{n}} تطابقات",
     "teacherMatchesCount": "{{n}} معلم/ة متطابق",
     "studentMatchesCount": "{{n}} طالب/ة متطابق",
-    "sharedSlotCount": "{{n}} وقت مشترك"
+    "sharedSlotCount": "{{n}} وقت مشترك",
+    "centerTitle": "مركز التعيين",
+    "centerSubtitle": "نظرة عامة على تعيينات الأكاديمية والعوائق ومعاينة السحب",
+    "openCenter": "فتح مركز التعيين",
+    "runPreview": "معاينة تعيين تلقائي",
+    "previewing": "جاري إعداد المعاينة…",
+    "previewTitle": "معاينة التعيين",
+    "previewSubtitle": "سيتم تعيين {{placements}} طالب/ة، وسيبقى {{blocked}} دون تعيين",
+    "noPlacements": "لا توجد تعيينات معلّقة — كل من يمكن تعيينه تم تعيينه بالفعل.",
+    "commit": "تأكيد وتطبيق",
+    "commitSuccess": "تم تطبيق {{ok}} تعيين ({{failed}} فشل)",
+    "commitFailed": "تعذّر تطبيق المعاينة",
+    "refresh": "تحديث البيانات",
+    "section": {
+      "unassignedStudents": "طلاب دون حلقة",
+      "teachersWithoutStudents": "معلمون دون طلاب",
+      "halaqahsWithCapacity": "حلقات بها أماكن شاغرة",
+      "fullHalaqahs": "حلقات ممتلئة",
+      "halaqahsMissingSlot": "حلقات دون وقت محدد",
+      "blockedStudents": "طلاب يتعذّر تعيينهم"
+    },
+    "empty": {
+      "unassignedStudents": "جميع الطلاب النشطين تم تعيينهم.",
+      "teachersWithoutStudents": "كل معلم/ة نشط لديه طلاب.",
+      "halaqahsWithCapacity": "لا توجد حلقات بها أماكن شاغرة حالياً.",
+      "fullHalaqahs": "لا توجد حلقات وصلت إلى الحد الأقصى.",
+      "halaqahsMissingSlot": "كل الحلقات محددة بوقت.",
+      "blockedStudents": "لا يوجد طلاب محجوبون بسبب قاعدة عمل."
+    },
+    "stats": {
+      "assignedStudents": "طلاب معيّنون",
+      "unassignedStudents": "طلاب بالانتظار",
+      "teachersWithoutStudents": "معلمون دون طلاب",
+      "halaqahsWithCapacity": "حلقات بها أماكن",
+      "halaqahsMissingSlot": "حلقات دون وقت",
+      "blockedNoHalaqah": "محجوب — لا توجد حلقة",
+      "blockedAllFull": "محجوب — الحلقات ممتلئة"
+    },
+    "reason": {
+      "wouldAssign": "سيتم تعيينه إلى {{halaqah}}",
+      "studentInactive": "حساب الطالب غير نشط",
+      "noSlotsDeclared": "الطالب لم يحدد أي وقت متاح",
+      "noHalaqahAtTime": "لا توجد حلقة تغطي أوقات الطالب",
+      "segmentMismatch": "الحلقات المتاحة لا تطابق فئة الطالب",
+      "halaqahMissingSlot": "توجد حلقة مطابقة لكن دون وقت محدد",
+      "halaqahsFull": "كل الحلقات المطابقة وصلت للحد الأقصى",
+      "teacherInactive": "معلم الحلقة المطابقة غير نشط"
+    },
+    "capacity": "{{n}}/{{cap}} طالب/ة",
+    "openHalaqah": "فتح الحلقة",
+    "openProfile": "فتح الملف",
+    "loadFailed": "تعذّر تحميل بيانات المركز"
   },
 
   "pagination": {
@@ -747,4 +809,5 @@
     "scanCompletedAssigned": "تم تعيين {{n}} طلاب مطابقين تلقائياً للحلقات الجديدة",
     "scanCompletedNone": "لا يوجد طلاب غير معينين مطابقين للتعيين التلقائي"
   }
+
 }

@@ -76,6 +76,9 @@ const AdminUserDetail = lazy(() =>
 const AdminSettings = lazy(() =>
   import("./pages/AdminSettings").then((m) => ({ default: m.AdminSettings })),
 );
+const MatchingCenter = lazy(() =>
+  import("./pages/MatchingCenter").then((m) => ({ default: m.MatchingCenter })),
+);
 const HalaqahDetails = lazy(() =>
   import("./pages/HalaqahDetails").then((m) => ({ default: m.HalaqahDetails })),
 );
@@ -559,6 +562,19 @@ function AppRoutes() {
                 change academy settings (per spec). */}
             <RoleGuard allow="admin">
               <AdminSettings />
+            </RoleGuard>
+          </AuthGuard>
+        }
+      />
+      <Route
+        path={ROUTES.adminMatching}
+        element={
+          <AuthGuard>
+            {/* Matching Center mirrors HalaqahForm CRUD permissions —
+                admin and supervisor_manager can both place students
+                and run sweeps. */}
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
+              <MatchingCenter />
             </RoleGuard>
           </AuthGuard>
         }

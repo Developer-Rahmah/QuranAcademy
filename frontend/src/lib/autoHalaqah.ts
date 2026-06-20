@@ -23,6 +23,7 @@
  * dispatch and surface the result.
  */
 import { db } from './supabase';
+import { supabase } from './supabase/client';
 import { canStudentJoinHalaqah } from './domain/roleRules';
 import { sharedSlots, normalizeSlots } from './matching';
 import { formatSlotRange } from './time';
@@ -283,7 +284,517 @@ export async function autoAssignStudent(
   return { halaqah: pick, membership: data };
 }
 
+// ---------------- Academy-wide sweep ---------------------------------
+
+/**
+ * Build an `AutoAssignContext` from the live data: every active
+ * halaqah + every active membership index. Used by the sweep below
+ * AND by AdminUsers's per-student activation flow, so both share a
+ * single source of truth for the ranking inputs.
+ */
+export async function loadAssignmentContext(): Promise<AutoAssignContext> {
+  const [halaqahsRes, membersRes] = await Promise.all([
+    db.halaqahs.getAll({ status: 'active' }),
+    supabase
+      .from('halaqah_members')
+      .select('halaqah_id, student_id')
+      .eq('status', 'active'),
+  ]);
+  const halaqahs = halaqahsRes.data ?? [];
+  const memberRows =
+    (membersRes.data ?? []) as Array<{ halaqah_id: string; student_id: string }>;
+  const memberCounts = new Map<string, number>();
+  const assignedStudentIds = new Set<string>();
+  for (const m of memberRows) {
+    memberCounts.set(m.halaqah_id, (memberCounts.get(m.halaqah_id) ?? 0) + 1);
+    assignedStudentIds.add(m.student_id);
+  }
+  return { halaqahs, memberCounts, assignedStudentIds };
+}
+
+export interface AssignmentSweepResult {
+  /** Active student rows considered by the sweep. */
+  considered: number;
+  /** Students newly placed into a halaqah this run. */
+  assigned: number;
+  /** Students that remained unassigned because no halaqah matched. */
+  unmatched: number;
+}
+
+/**
+ * Walk every active student NOT currently in a halaqah and try to
+ * place them via `autoAssignStudent`. Mutates a local copy of the
+ * context's maps as it goes so successive placements stay
+ * load-balanced. Returns a count summary the caller can toast.
+ *
+ * Idempotent and safe to re-run — already-assigned students are
+ * skipped by the predicate inside autoAssignStudent.
+ */
+export async function runAssignmentSweep(): Promise<AssignmentSweepResult> {
+  const ctx = await loadAssignmentContext();
+  const { data: candidates } = await db.profiles.getAll({
+    role: 'student',
+    status: 'active',
+  });
+  const memberCounts = new Map(ctx.memberCounts);
+  const assignedStudentIds = new Set(ctx.assignedStudentIds);
+
+  let assigned = 0;
+  let considered = 0;
+  for (const student of candidates ?? []) {
+    considered += 1;
+    if (assignedStudentIds.has(student.id)) continue;
+    const result = await autoAssignStudent(student, {
+      halaqahs: ctx.halaqahs,
+      memberCounts,
+      assignedStudentIds,
+    });
+    if (result.halaqah && result.membership) {
+      memberCounts.set(
+        result.halaqah.id,
+        (memberCounts.get(result.halaqah.id) ?? 0) + 1,
+      );
+      assignedStudentIds.add(student.id);
+      assigned += 1;
+    }
+  }
+  const unmatched = (candidates ?? []).filter(
+    (s) => !assignedStudentIds.has(s.id),
+  ).length;
+  return { considered, assigned, unmatched };
+}
+
 // ---------------- Slot helpers re-exports ----------------------------
 
 /** Convenience re-export so callers can show slot labels too. */
-export { sharedSlots, normalizeSlots };
+export { sharedSlots, normalizeSlots, readSlotFromSchedule };
+
+// ====================================================================
+// MATCHING CENTER — diagnostic + preview infrastructure
+// ====================================================================
+//
+// The "Matching Center" page composes these helpers to answer three
+// questions an admin asks every day:
+//   1. WHO is unassigned and WHY?
+//   2. WHAT would the next sweep do?
+//   3. WHERE are the gaps (capacity, missing slots, idle teachers)?
+//
+// Everything below is built on top of the existing matcher (`findMatches`,
+// `rankHalaqahsForStudent`, `canStudentJoinHalaqah`) — no new business
+// rules, no DB schema changes. Pure functions are the default; the only
+// I/O entry points are `loadMatchingState` (read) and
+// `commitSweepPlacements` (write, batched).
+
+/**
+ * Soft target for halaqah size. Halaqahs at or above this count are
+ * flagged "full" in the matching center; they remain valid auto-assign
+ * candidates so the matcher itself never blocks placement on capacity
+ * alone (admins can still drop students into a full halaqah by hand).
+ *
+ * Tunable — adjust here if your academy uses a different rule of thumb.
+ */
+export const HALAQAH_TARGET_SIZE = 15;
+
+/** Why a student is currently unassigned. Stable, i18n-key-friendly. */
+export type UnassignmentReason =
+  /** student.status !== 'active' — never auto-assigned. */
+  | 'student_inactive'
+  /** student.available_times is empty — nothing to match against. */
+  | 'no_slots_declared'
+  /** No halaqah's `schedule.slot` overlaps any of the student's slots. */
+  | 'no_halaqah_at_time'
+  /** Halaqahs exist at the time but the gender/audience rule blocks all. */
+  | 'segment_mismatch'
+  /**
+   * A halaqah exists that COULD cover the time but its `schedule.slot`
+   * is empty (legacy / manually-created without the field). Backfill
+   * the slot via HalaqahDetails and the student becomes matchable.
+   */
+  | 'halaqah_missing_slot'
+  /** All matching halaqahs are at or over `HALAQAH_TARGET_SIZE`. */
+  | 'halaqahs_full'
+  /** The only matching halaqah's teacher is suspended/inactive. */
+  | 'teacher_inactive';
+
+/**
+ * Snapshot of every input the Matching Center needs in one place.
+ * Built via a single batched fetch (`loadMatchingState`) so the page
+ * runs four light queries on mount and zero on interaction.
+ *
+ *   halaqahsAll       — every halaqah row regardless of status, with the
+ *                       teacher relation joined. Lets us detect
+ *                       "halaqah_missing_slot" + "teacher_inactive".
+ *   halaqahsActive    — subset used for the actual matcher.
+ *   memberCounts      — halaqah_id → active member count.
+ *   assignedStudentIds — student ids in any active membership.
+ *   students          — every active student (matching candidates).
+ *   teachersById      — id → teacher profile, for inactive-teacher diagnosis.
+ */
+export interface MatchingState {
+  halaqahsAll: Halaqah[];
+  halaqahsActive: Halaqah[];
+  memberCounts: ReadonlyMap<string, number>;
+  assignedStudentIds: ReadonlySet<string>;
+  students: Profile[];
+  teachersById: ReadonlyMap<string, Profile>;
+}
+
+/**
+ * One batched load of everything the Matching Center needs. Four
+ * parallel queries; all projected to the columns the page reads. No
+ * N+1, no incremental refetch loops.
+ */
+export async function loadMatchingState(): Promise<MatchingState> {
+  const [halaqahsRes, membersRes, studentsRes, teachersRes] = await Promise.all([
+    db.halaqahs.getAll({}),
+    supabase
+      .from('halaqah_members')
+      .select('halaqah_id, student_id')
+      .eq('status', 'active'),
+    db.profiles.getAll({ role: 'student', status: 'active' }),
+    supabase
+      .from('profiles')
+      .select('id, first_name, second_name, third_name, status, segment')
+      .eq('role', 'teacher'),
+  ]);
+
+  const halaqahsAll = halaqahsRes.data ?? [];
+  const halaqahsActive = halaqahsAll.filter((h) => h.status === 'active');
+
+  const memberRows =
+    (membersRes.data ?? []) as Array<{ halaqah_id: string; student_id: string }>;
+  const memberCounts = new Map<string, number>();
+  const assignedStudentIds = new Set<string>();
+  for (const m of memberRows) {
+    memberCounts.set(m.halaqah_id, (memberCounts.get(m.halaqah_id) ?? 0) + 1);
+    assignedStudentIds.add(m.student_id);
+  }
+
+  const teachersById = new Map<string, Profile>();
+  for (const t of (teachersRes.data ?? []) as Profile[]) {
+    teachersById.set(t.id, t);
+  }
+
+  return {
+    halaqahsAll,
+    halaqahsActive,
+    memberCounts,
+    assignedStudentIds,
+    students: studentsRes.data ?? [],
+    teachersById,
+  };
+}
+
+/** Build an `AutoAssignContext` from a `MatchingState`. Cheap. */
+export function contextFromState(state: MatchingState): AutoAssignContext {
+  return {
+    halaqahs: state.halaqahsActive,
+    memberCounts: state.memberCounts,
+    assignedStudentIds: state.assignedStudentIds,
+  };
+}
+
+export interface StudentAnalysis {
+  studentId: string;
+  /** When set: the placement `runAssignmentSweep` would produce. */
+  proposedHalaqah: Halaqah | null;
+  /** When `proposedHalaqah` is null, the precise reason. */
+  reason: UnassignmentReason | null;
+  /** All halaqahs whose time slot overlaps the student's (any status). */
+  timeMatchingHalaqahs: Halaqah[];
+  /** Subset of `timeMatchingHalaqahs` blocked by capacity. */
+  fullHalaqahs: Halaqah[];
+}
+
+/**
+ * Walk the matcher for a single student and explain the outcome.
+ * Pure — call as many times as you like; no I/O.
+ *
+ * Reason precedence (most specific first):
+ *   1. student_inactive
+ *   2. no_slots_declared
+ *   3. would_assign           (proposedHalaqah set, reason null)
+ *   4. halaqahs_full          (compatible matches exist but all at cap)
+ *   5. teacher_inactive       (matching halaqah but teacher suspended)
+ *   6. segment_mismatch       (any halaqah at the time, none pass segment)
+ *   7. halaqah_missing_slot   (some halaqah has empty schedule.slot)
+ *   8. no_halaqah_at_time     (catch-all)
+ */
+export function analyzeStudent(
+  student: Profile,
+  state: MatchingState,
+  capacity: number = HALAQAH_TARGET_SIZE,
+): StudentAnalysis {
+  const baseEmpty: StudentAnalysis = {
+    studentId: student.id,
+    proposedHalaqah: null,
+    reason: null,
+    timeMatchingHalaqahs: [],
+    fullHalaqahs: [],
+  };
+
+  if (student.status !== 'active') {
+    return { ...baseEmpty, reason: 'student_inactive' };
+  }
+
+  const studentSlots = new Set(normalizeSlots(student));
+  if (studentSlots.size === 0) {
+    return { ...baseEmpty, reason: 'no_slots_declared' };
+  }
+
+  // Pass 1: full ranker (the live matcher's view). If anything ranks,
+  // pick the least-full (which is what the sweep would do).
+  const ranked = rankHalaqahsForStudent(student, contextFromState(state));
+
+  // Capacity filter — halaqahs at/over target are flagged but kept
+  // as candidates so the matcher itself never refuses placement.
+  const withinCapacity = ranked.filter(
+    (h) => (state.memberCounts.get(h.id) ?? 0) < capacity,
+  );
+  if (withinCapacity.length > 0) {
+    return {
+      studentId: student.id,
+      proposedHalaqah: withinCapacity[0],
+      reason: null,
+      timeMatchingHalaqahs: ranked,
+      fullHalaqahs: ranked.filter(
+        (h) => (state.memberCounts.get(h.id) ?? 0) >= capacity,
+      ),
+    };
+  }
+  if (ranked.length > 0) {
+    return {
+      studentId: student.id,
+      proposedHalaqah: null,
+      reason: 'halaqahs_full',
+      timeMatchingHalaqahs: ranked,
+      fullHalaqahs: ranked,
+    };
+  }
+
+  // Pass 2: no compatible ranked match. Diagnose why.
+  // Halaqahs whose time slot overlaps the student, ANY status, regardless
+  // of segment compatibility — used to distinguish gaps from misroutes.
+  const timeMatches = state.halaqahsAll.filter((h) => {
+    const slot = readSlotFromSchedule(h.schedule);
+    return slot ? studentSlots.has(slot) : false;
+  });
+
+  if (timeMatches.length > 0) {
+    // A halaqah covers the time. Why didn't the matcher pick it?
+    const anyActive = timeMatches.some((h) => h.status === 'active');
+    if (!anyActive) {
+      // Halaqahs exist at the time but none are active — could be all
+      // suspended/completed. Treat as time gap for the admin's purpose.
+      return {
+        ...baseEmpty,
+        reason: 'no_halaqah_at_time',
+        timeMatchingHalaqahs: timeMatches,
+      };
+    }
+    // Any active time-match whose TEACHER is inactive?
+    const activeMatches = timeMatches.filter((h) => h.status === 'active');
+    const allTeachersInactive = activeMatches.every((h) => {
+      if (!h.teacher_id) return true;
+      const teacher = state.teachersById.get(h.teacher_id);
+      return !teacher || teacher.status !== 'active';
+    });
+    if (allTeachersInactive) {
+      return {
+        ...baseEmpty,
+        reason: 'teacher_inactive',
+        timeMatchingHalaqahs: activeMatches,
+      };
+    }
+    // Time + active teacher but the gender rule blocked them.
+    return {
+      ...baseEmpty,
+      reason: 'segment_mismatch',
+      timeMatchingHalaqahs: activeMatches,
+    };
+  }
+
+  // No halaqah has a recognised slot for this student. Last check: is
+  // there a halaqah missing `schedule.slot` that the admin should
+  // backfill? (Heuristic — surfaces the legacy-data gap.)
+  const missingSlotCount = state.halaqahsAll.filter(
+    (h) => h.status === 'active' && !readSlotFromSchedule(h.schedule),
+  ).length;
+  if (missingSlotCount > 0) {
+    return { ...baseEmpty, reason: 'halaqah_missing_slot' };
+  }
+
+  return { ...baseEmpty, reason: 'no_halaqah_at_time' };
+}
+
+export interface SweepPreview {
+  /** Students the next sweep would place + the target halaqah. */
+  placements: Array<{ student: Profile; halaqah: Halaqah }>;
+  /** Students that would remain unassigned + the precise reason. */
+  blocked: Array<{
+    student: Profile;
+    reason: UnassignmentReason;
+    detail?: StudentAnalysis;
+  }>;
+}
+
+/**
+ * Dry-run the sweep over the snapshot. Mirrors `runAssignmentSweep`'s
+ * traversal order + load-balancing exactly: each placement updates a
+ * local copy of the member counts so successive picks stay balanced.
+ * Returns the proposed placements without writing anything.
+ *
+ * Pure function — caller controls when (or whether) to commit.
+ */
+export function buildSweepPreview(
+  state: MatchingState,
+  capacity: number = HALAQAH_TARGET_SIZE,
+): SweepPreview {
+  const placements: SweepPreview['placements'] = [];
+  const blocked: SweepPreview['blocked'] = [];
+
+  const memberCounts = new Map(state.memberCounts);
+  const assignedStudentIds = new Set(state.assignedStudentIds);
+
+  for (const student of state.students) {
+    if (assignedStudentIds.has(student.id)) continue;
+
+    // Build a transient state with the updated counts so the analyzer
+    // sees the placements made by earlier iterations of this sweep.
+    const transient: MatchingState = {
+      ...state,
+      memberCounts,
+      assignedStudentIds,
+    };
+    const analysis = analyzeStudent(student, transient, capacity);
+    if (analysis.proposedHalaqah) {
+      placements.push({ student, halaqah: analysis.proposedHalaqah });
+      memberCounts.set(
+        analysis.proposedHalaqah.id,
+        (memberCounts.get(analysis.proposedHalaqah.id) ?? 0) + 1,
+      );
+      assignedStudentIds.add(student.id);
+    } else if (analysis.reason) {
+      blocked.push({
+        student,
+        reason: analysis.reason,
+        detail: analysis,
+      });
+    }
+  }
+
+  return { placements, blocked };
+}
+
+/**
+ * Commit a previously-built preview by inserting one membership row
+ * per placement. Returns an `{ok, failed}` summary; individual
+ * failures are logged but do not abort the loop so partial success
+ * still lands cleanly.
+ */
+export async function commitSweepPlacements(
+  placements: SweepPreview['placements'],
+): Promise<{ ok: number; failed: number }> {
+  let ok = 0;
+  let failed = 0;
+  for (const { student, halaqah } of placements) {
+    const { error } = await db.members.add(halaqah.id, student.id);
+    if (error) {
+      console.warn('commitSweepPlacements: insert failed', error);
+      failed += 1;
+      continue;
+    }
+    ok += 1;
+  }
+  return { ok, failed };
+}
+
+export interface MatchingStats {
+  assignedStudents: number;
+  unassignedStudents: number;
+  teachersWithoutStudents: number;
+  halaqahsWithCapacity: number;
+  fullHalaqahs: number;
+  halaqahsMissingSlot: number;
+  blockedNoHalaqah: number;
+  blockedAllFull: number;
+}
+
+/**
+ * Aggregate the snapshot into the dashboard numbers. Pure and O(n) —
+ * one pass over students for the reason histogram, one pass over
+ * halaqahs for the capacity histogram.
+ */
+export function computeMatchingStats(
+  state: MatchingState,
+  capacity: number = HALAQAH_TARGET_SIZE,
+): MatchingStats {
+  let halaqahsWithCapacity = 0;
+  let fullHalaqahs = 0;
+  let halaqahsMissingSlot = 0;
+  for (const h of state.halaqahsActive) {
+    const count = state.memberCounts.get(h.id) ?? 0;
+    if (count < capacity) halaqahsWithCapacity += 1;
+    else fullHalaqahs += 1;
+    if (!readSlotFromSchedule(h.schedule)) halaqahsMissingSlot += 1;
+  }
+
+  const teachersWithMembers = new Set<string>();
+  for (const h of state.halaqahsActive) {
+    if (!h.teacher_id) continue;
+    if ((state.memberCounts.get(h.id) ?? 0) > 0) {
+      teachersWithMembers.add(h.teacher_id);
+    }
+  }
+  let teachersWithoutStudents = 0;
+  for (const t of state.teachersById.values()) {
+    if (t.status !== 'active') continue;
+    if (!teachersWithMembers.has(t.id)) teachersWithoutStudents += 1;
+  }
+
+  let unassignedStudents = 0;
+  let blockedNoHalaqah = 0;
+  let blockedAllFull = 0;
+  for (const s of state.students) {
+    if (state.assignedStudentIds.has(s.id)) continue;
+    unassignedStudents += 1;
+    const a = analyzeStudent(s, state, capacity);
+    if (a.reason === 'halaqahs_full') blockedAllFull += 1;
+    else if (
+      a.reason === 'no_halaqah_at_time' ||
+      a.reason === 'halaqah_missing_slot' ||
+      a.reason === 'segment_mismatch' ||
+      a.reason === 'teacher_inactive'
+    ) {
+      blockedNoHalaqah += 1;
+    }
+  }
+
+  const assignedStudents = state.assignedStudentIds.size;
+  return {
+    assignedStudents,
+    unassignedStudents,
+    teachersWithoutStudents,
+    halaqahsWithCapacity,
+    fullHalaqahs,
+    halaqahsMissingSlot,
+    blockedNoHalaqah,
+    blockedAllFull,
+  };
+}
+
+/**
+ * i18n key resolver for a reason. Centralized so the page (and any
+ * future toast / report) renders identical text.
+ */
+export function unassignmentReasonKey(reason: UnassignmentReason): string {
+  switch (reason) {
+    case 'student_inactive':       return 'matching.reason.studentInactive';
+    case 'no_slots_declared':      return 'matching.reason.noSlotsDeclared';
+    case 'no_halaqah_at_time':     return 'matching.reason.noHalaqahAtTime';
+    case 'segment_mismatch':       return 'matching.reason.segmentMismatch';
+    case 'halaqah_missing_slot':   return 'matching.reason.halaqahMissingSlot';
+    case 'halaqahs_full':          return 'matching.reason.halaqahsFull';
+    case 'teacher_inactive':       return 'matching.reason.teacherInactive';
+  }
+}

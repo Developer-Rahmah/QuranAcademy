@@ -28,6 +28,7 @@ export const ROUTES = {
   adminUsers: '/admin/users',
   adminUserDetail: '/admin/users/:id',
   adminSettings: '/admin/settings',
+  adminMatching: '/admin/matching',
   halaqahDetails: '/halaqah/:id',
   reportNew: '/report/new',
   reportEdit: '/report/:id/edit',
