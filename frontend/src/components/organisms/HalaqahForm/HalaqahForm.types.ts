@@ -30,6 +30,14 @@ export interface HalaqahFormData {
    * teacher/student profiles, not on the halaqah itself).
    */
   segment: Extract<UserSegment, 'men' | 'women'>;
+  /**
+   * Canonical time slot id (e.g. "17-19") written into the row's
+   * `schedule` jsonb as `{ slot: <id> }`. Persisting this lets the
+   * auto-assigner see manually-created halaqahs the same way it
+   * sees auto-created ones — without it, the matcher silently
+   * skips the row. Empty string means "no slot selected".
+   */
+  slot: string;
 }
 
 export interface HalaqahFormErrors {

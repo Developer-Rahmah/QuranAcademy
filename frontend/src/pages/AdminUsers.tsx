@@ -23,7 +23,8 @@ import { buildMatchIndex, findMatches } from '../lib/matching';
 import {
   autoAssignStudent,
   createHalaqahsForTeacher,
-  type AutoAssignContext,
+  loadAssignmentContext,
+  runAssignmentSweep,
 } from '../lib/autoHalaqah';
 import { buildWhatsAppLink } from '../lib/utils';
 import { useToast } from '../context/ToastContext';
@@ -491,8 +492,10 @@ export function AdminUsers() {
   };
 
   // Auto-assign a single student to the best-fitting halaqah.
+  // Reuses the shared `loadAssignmentContext` helper so the ranking
+  // inputs match the academy-wide sweep one-for-one.
   const runStudentActivationAutomation = async (student: Profile) => {
-    const ctx = await loadAssignContext();
+    const ctx = await loadAssignmentContext();
     const result = await autoAssignStudent(student, ctx);
     if (result.halaqah && result.membership) {
       toast.success(
@@ -510,65 +513,17 @@ export function AdminUsers() {
     // doesn't need a toast for the no-op case.
   };
 
-  // Pull the academy-wide context needed to rank halaqahs for any
-  // student: every active halaqah + the active-membership index.
-  const loadAssignContext = async (): Promise<AutoAssignContext> => {
-    const [halaqahsRes, membersRes] = await Promise.all([
-      db.halaqahs.getAll({ status: 'active' }),
-      supabase
-        .from('halaqah_members')
-        .select('halaqah_id, student_id')
-        .eq('status', 'active'),
-    ]);
-    const halaqahs = halaqahsRes.data ?? [];
-    const memberRows =
-      (membersRes.data ?? []) as Array<{ halaqah_id: string; student_id: string }>;
-    const memberCounts = new Map<string, number>();
-    const assignedStudentIds = new Set<string>();
-    for (const m of memberRows) {
-      memberCounts.set(m.halaqah_id, (memberCounts.get(m.halaqah_id) ?? 0) + 1);
-      assignedStudentIds.add(m.student_id);
-    }
-    return { halaqahs, memberCounts, assignedStudentIds };
-  };
-
-  // Walk every active, unassigned student and try to slot them into
-  // the best halaqah. Called after a teacher is activated so newly
-  // created halaqahs immediately pick up the waitlist.
+  // Academy-wide sweep — delegates to the shared helper so the
+  // dashboard's "Re-run matching sweep" button and the post-teacher-
+  // activation flow stay in lockstep.
   const sweepUnassignedStudents = async () => {
-    const ctx = await loadAssignContext();
-    // Pull every active student in one paginated-friendly query —
-    // they're the candidates for the sweep. Limit to status='active'
-    // because we only want already-vetted students to land in a
-    // halaqah; pending students stay where they are.
-    const { data: candidates } = await db.profiles.getAll({
-      role: 'student',
-      status: 'active',
-    });
-    let assigned = 0;
-    // Mutable copies of the maps so each successful insert updates
-    // the load-balance signal for the next iteration.
-    const memberCounts = new Map(ctx.memberCounts);
-    const assignedStudentIds = new Set(ctx.assignedStudentIds);
-    for (const student of candidates ?? []) {
-      if (assignedStudentIds.has(student.id)) continue;
-      const result = await autoAssignStudent(student, {
-        halaqahs: ctx.halaqahs,
-        memberCounts,
-        assignedStudentIds,
-      });
-      if (result.halaqah && result.membership) {
-        memberCounts.set(
-          result.halaqah.id,
-          (memberCounts.get(result.halaqah.id) ?? 0) + 1,
-        );
-        assignedStudentIds.add(student.id);
-        assigned += 1;
-      }
-    }
-    if (assigned > 0) {
+    const result = await runAssignmentSweep();
+    if (result.assigned > 0) {
       toast.success(
-        t('autoAssign.scanCompletedAssigned').replace('{{n}}', String(assigned)),
+        t('autoAssign.scanCompletedAssigned').replace(
+          '{{n}}',
+          String(result.assigned),
+        ),
       );
     } else {
       toast.info(t('autoAssign.scanCompletedNone'));

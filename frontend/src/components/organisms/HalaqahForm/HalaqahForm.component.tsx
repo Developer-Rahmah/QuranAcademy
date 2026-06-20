@@ -28,6 +28,9 @@ import {
   segmentationRules,
 } from '../../../lib/segmentationRules';
 import { UserSegment, type HalaqahSegment } from '../../../lib/enums';
+import { TIME_SLOTS } from '../../../lib/constants';
+import { formatSlotRange } from '../../../lib/time';
+import { readSlotFromSchedule } from '../../../lib/autoHalaqah';
 import { halaqahFormStyles as styles } from './HalaqahForm.style';
 import type { HalaqahFormProps, HalaqahFormData, HalaqahFormErrors } from './HalaqahForm.types';
 import type { Profile } from '../../../types';
@@ -53,6 +56,11 @@ function makeInitialFormData(segment: HalaqahSegment): HalaqahFormData {
     target_audience: segmentationRules.getDefaultAudience(segment),
     status: 'active',
     segment,
+    // Empty string means "no slot picked yet" — surfaced as an
+    // explicit option in the dropdown so admins can either pick a
+    // canonical slot (preferred) or leave it blank for legacy rows
+    // they'll edit later.
+    slot: '',
   };
 }
 
@@ -119,6 +127,10 @@ export function HalaqahForm({
           segmentationRules.getDefaultAudience(persistedSegment),
         status: halaqah.status || 'active',
         segment: persistedSegment,
+        // Read the existing slot if the row already has one. Empty
+        // string when the legacy/manual halaqah was created without
+        // it — admin can pick a slot here and re-save to backfill.
+        slot: readSlotFromSchedule(halaqah.schedule) ?? '',
       });
     } else {
       setFormData(makeInitialFormData(DEFAULT_SEGMENT));
@@ -183,8 +195,14 @@ export function HalaqahForm({
 
     try {
       // Coerce UI-only audience value ('men' → 'both') to a DB-safe literal;
-      // segment preserves the gender.
-      const payload = {
+      // segment preserves the gender. The `schedule` jsonb carries the
+      // canonical time-slot id so the auto-assigner can see this halaqah
+      // the same way it sees auto-created ones (matcher reads
+      // `schedule.slot` via lib/autoHalaqah.readSlotFromSchedule).
+      // Empty `slot` stores an empty schedule object — the row still
+      // saves cleanly and the admin can backfill the slot later via
+      // edit.
+      const payload: Record<string, unknown> = {
         name: formData.name,
         teacher_id: formData.teacher_id,
         meet_link: formData.meet_link,
@@ -192,6 +210,7 @@ export function HalaqahForm({
         target_audience: submitPreferredAudience(formData.target_audience),
         status: formData.status,
         segment: formData.segment,
+        schedule: formData.slot ? { slot: formData.slot } : {},
       };
 
       if (isEditing && halaqah) {
@@ -367,6 +386,28 @@ export function HalaqahForm({
               options={audienceOptions}
             />
           </div>
+        </div>
+
+        {/* Time slot — drives the auto-assigner's matching. The dropdown
+            also offers a sentinel empty option so legacy halaqahs whose
+            slot is unknown can still be saved (admin can backfill
+            later). When set, it writes to `schedule.slot`. */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-foreground">
+            {t('admin.timeSlotLabel')}
+          </label>
+          <Select
+            value={formData.slot}
+            onChange={(e) => handleChange('slot', e.target.value)}
+            options={[
+              { value: '', label: t('admin.timeSlotNone') },
+              ...TIME_SLOTS.map((s) => ({
+                value: s.id,
+                label: formatSlotRange(s.id, 'ar'),
+              })),
+            ]}
+          />
+          <p className="text-xs text-muted">{t('admin.timeSlotHint')}</p>
         </div>
 
         {isEditing && (

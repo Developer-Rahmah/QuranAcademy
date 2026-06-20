@@ -21,7 +21,10 @@ import { PaginatedList } from '../components/molecules/Pagination';
 import { ROUTES } from '../lib/routes';
 import { useTranslation } from '../locales/i18n';
 import { getDisplayName } from '../lib/utils';
-import { TOTAL_QURAN_PAGES } from '../lib/constants';
+import { TIME_SLOTS, TOTAL_QURAN_PAGES } from '../lib/constants';
+import { formatSlotRange } from '../lib/time';
+import { readSlotFromSchedule } from '../lib/autoHalaqah';
+import { Select } from '../components/atoms/Select';
 import { segmentationRules } from '../lib/segmentationRules';
 import { uiText } from '../lib/uiText';
 import {
@@ -30,7 +33,7 @@ import {
   canContactStudents,
   canManageStudentActivation,
 } from '../lib/permissions';
-import type { AccountStatus, StudentWithProgress } from '../types';
+import type { AccountStatus, Halaqah, StudentWithProgress } from '../types';
 
 interface HalaqahStats {
   totalMemorization: number;
@@ -112,6 +115,38 @@ export function HalaqahDetails() {
   const [showStudentAssignment, setShowStudentAssignment] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingHalaqah, setDeletingHalaqah] = useState(false);
+
+  // Backfill state for legacy/manual halaqahs that were saved without
+  // a canonical `schedule.slot`. The banner below surfaces the gap
+  // and lets the admin pick a slot inline; saving writes it via
+  // `db.halaqahs.update` and the matcher immediately starts including
+  // this halaqah in auto-assignment.
+  const [draftSlot, setDraftSlot] = useState('');
+  const [savingSlot, setSavingSlot] = useState(false);
+  const currentSlot = halaqah ? readSlotFromSchedule(halaqah.schedule) : null;
+
+  const handleSaveSlot = async () => {
+    if (!halaqah?.id || !draftSlot) return;
+    setSavingSlot(true);
+    try {
+      const { error } = await db.halaqahs.update(halaqah.id, {
+        // Cast: `schedule` lives in the row's jsonb and the typed
+        // facade narrows to `Halaqah['schedule']` which is
+        // intentionally loose. The matcher reads back `{ slot }`.
+        schedule: { slot: draftSlot } as unknown as Halaqah['schedule'],
+      });
+      if (error) {
+        console.error('Failed to save slot:', error);
+        toast.error(t('errors.generic'));
+        return;
+      }
+      toast.success(t('admin.slotSaved'));
+      setDraftSlot('');
+      await refetch?.();
+    } finally {
+      setSavingSlot(false);
+    }
+  };
 
   // Delete the halaqah. CASCADE on halaqahs.id covers halaqah_members,
   // halaqah_supervisors, and reports — see migration 0001. On success
@@ -344,6 +379,45 @@ export function HalaqahDetails() {
               {t('admin.deleteHalaqah')}
             </Button>
           </div>
+        )}
+
+        {/* Backfill banner for legacy/manual halaqahs whose
+            `schedule.slot` is empty. Auto-assignment skips these
+            silently — surfacing the gap with an inline picker lets
+            the admin fix it in one click without leaving the page.
+            Hidden once the halaqah has a slot OR when the viewer
+            can't manage halaqahs anyway. */}
+        {canManage && !currentSlot && (
+          <Card padding="md" variant="bordered" className="border-warning/40 bg-warning/5">
+            <h3 className="text-base font-semibold text-foreground mb-1">
+              {t('admin.missingTimeSlotTitle')}
+            </h3>
+            <p className="text-sm text-muted mb-3">
+              {t('admin.missingTimeSlotBody')}
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex-1 min-w-[200px]">
+                <Select
+                  value={draftSlot}
+                  onChange={(e) => setDraftSlot(e.target.value)}
+                  options={[
+                    { value: '', label: t('admin.timeSlotNone') },
+                    ...TIME_SLOTS.map((s) => ({
+                      value: s.id,
+                      label: formatSlotRange(s.id, 'ar'),
+                    })),
+                  ]}
+                />
+              </div>
+              <Button
+                onClick={handleSaveSlot}
+                loading={savingSlot}
+                disabled={!draftSlot}
+              >
+                {t('admin.saveSlot')}
+              </Button>
+            </div>
+          </Card>
         )}
 
         {/* Halaqah Info */}
