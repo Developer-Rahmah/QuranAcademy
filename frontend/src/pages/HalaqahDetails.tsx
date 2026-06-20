@@ -522,7 +522,12 @@ export function HalaqahDetails() {
                 ? supervisors.filter((s) => {
                     const name = s.user ? getDisplayName(s.user).toLowerCase() : '';
                     const email = (s.user?.email || '').toLowerCase();
-                    return name.includes(q) || email.includes(q);
+                    const phone = (s.user?.phone || '').toLowerCase();
+                    return (
+                      name.includes(q) ||
+                      email.includes(q) ||
+                      phone.includes(q)
+                    );
                   })
                 : supervisors;
               return (

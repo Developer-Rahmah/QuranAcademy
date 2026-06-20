@@ -212,14 +212,17 @@ export function StudentAssignment({
         );
       }
 
-      // Search — name + email.
+      // Search — name + email + phone. Phone match handles partial
+      // numbers (admins often paste the last 4-5 digits when looking
+      // up a parent by WhatsApp).
       const q = searchQuery.trim().replace(/[%,()]/g, '');
       if (q) {
         query = query.or(
           `first_name.ilike.%${q}%,` +
             `second_name.ilike.%${q}%,` +
             `third_name.ilike.%${q}%,` +
-            `email.ilike.%${q}%`,
+            `email.ilike.%${q}%,` +
+            `phone.ilike.%${q}%`,
         );
       }
 

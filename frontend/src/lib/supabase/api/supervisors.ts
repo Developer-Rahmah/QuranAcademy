@@ -40,6 +40,14 @@ export interface HalaqahSupervisorWithProfile extends HalaqahSupervisorRow {
     second_name: string;
     third_name?: string;
     email: string;
+    /**
+     * Used by the per-row search to match by phone. Typed loose
+     * (string) — matches `Profile.phone`'s shape so `getDisplayName`
+     * and other Profile-consumers accept the embedded user verbatim.
+     * Runtime null arrives from the DB; the `|| ''` guard at the
+     * call site keeps it safe.
+     */
+    phone?: string;
   } | null;
 }
 
@@ -65,7 +73,7 @@ async function listByHalaqah(halaqahId: string): Promise<ListResult<HalaqahSuper
   const client = supabase as any;
   const { data, error } = await client
     .from('halaqah_supervisors')
-    .select('*, user:profiles!user_id(id, first_name, second_name, third_name, email)')
+    .select('*, user:profiles!user_id(id, first_name, second_name, third_name, email, phone)')
     .eq('halaqah_id', halaqahId);
   return { data: (data as HalaqahSupervisorWithProfile[]) ?? null, error };
 }
