@@ -9,6 +9,7 @@ import { DashboardLayout, PageSection } from '../components/templates/DashboardL
 import { Card } from '../components/molecules/Card';
 import { StatCard, StatCardRow } from '../components/molecules/StatCard';
 import { MeetLinkCard } from '../components/molecules/MeetLinkCard';
+import { ClosedSlotBadge } from '../components/molecules/ClosedSlotBadge';
 import { StudentTable } from '../components/organisms/StudentTable';
 import { HalaqahForm } from '../components/organisms/HalaqahForm';
 import { StudentAssignment } from '../components/organisms/StudentAssignment';
@@ -425,9 +426,16 @@ export function HalaqahDetails() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="text-center md:text-right">
               <p className="text-sm text-muted mb-1">{t('halaqah.halaqahName')}</p>
-              <p className="text-lg font-medium text-foreground">
-                {halaqah.name}
-              </p>
+              <div className="flex flex-wrap items-center justify-center md:justify-end gap-2">
+                <p className="text-lg font-medium text-foreground">
+                  {halaqah.name}
+                </p>
+                <ClosedSlotBadge
+                  schedule={halaqah.schedule}
+                  segment={halaqah.segment}
+                  size="md"
+                />
+              </div>
             </div>
             <div className="text-center md:text-right">
               <p className="text-sm text-muted mb-1">{t('halaqah.teacherName')}</p>

@@ -96,6 +96,8 @@
     "ageRequired": "Age is required",
     "countryRequired": "Country is required",
     "timeSlotsRequired": "Please select at least one time slot",
+    "timeSlotClosed": "One of the selected times is temporarily complete. Please pick a different slot.",
+    "timeSlotNotYetOpen": "One of the selected times has no halaqah yet. Please pick an available slot.",
     "agreementRequired": "Please agree to terms and conditions",
     "fixErrors": "Please fix the errors in the form",
     "pagesTooFew": "Minimum: a quarter page (0.25)",
@@ -138,7 +140,10 @@
     "teachingExperience": "Teaching Experience",
     "availableTimes": "Available Times (Mecca timezone)",
     "selectAvailableTimes": "Select available study times — Mecca timezone",
+    "availableTime": "Available Time (Mecca timezone)",
+    "selectAvailableTime": "Choose one time slot for your halaqah — Mecca timezone",
     "agreement": "I pledge to attend regularly, respect the etiquette of the Quran circle, submit reports, and refrain from posting external links.",
+    "agreementTeacher": "I pledge to attend regularly, respect the etiquette of the Quran circle, and refrain from posting external links.",
     "submitRegistration": "Register",
     "backToSignup": "Back to sign up",
     "successTitle": "Registration Successful!",
@@ -494,7 +499,37 @@
     "emailAddress": "Email address",
     "save": "Save changes",
     "saveSuccess": "Settings saved successfully",
-    "saveError": "Failed to save settings"
+    "saveError": "Failed to save settings",
+    "closuresTitle": "Time slot closures",
+    "closuresHint": "Mark a time slot as temporarily complete. Teachers registering will see it disabled and pick another time. Students are not affected.",
+    "closureOn": "Closed",
+    "closureOff": "Open",
+    "closuresFooter": "{{n}} slot(s) currently marked as complete.",
+    "closuresHowTitle": "How this works",
+    "closuresHow1": "Closures are set per gender segment — closing 7-9 PM for women doesn't affect men.",
+    "closuresHow2": "New teacher registration disables the slot only for applicants of the matching gender.",
+    "closuresHow3": "Students are not affected — they can still register and join running halaqahs.",
+    "closuresSummaryClosed": "{{n}} closed",
+    "closuresSummaryOpen": "{{n}} open",
+    "closuresReopenAll": "Reopen all (both segments)",
+    "closuresGroupClosed": "Currently closed",
+    "closuresGroupOpen": "Currently open",
+    "closuresEmptyClosed": "No time slots are closed for this segment. Tap any open slot below to mark it as temporarily complete.",
+    "closuresSegmentTabsLabel": "Choose which segment to manage",
+    "unopenedTitle": "Student slot availability",
+    "unopenedHowTitle": "How this works",
+    "unopenedHow1": "Mark a slot as \"not yet available\" when no halaqah has opened for it — students of the matching gender won't see it during registration.",
+    "unopenedHow2": "Once a teacher is activated for that time, unmark the slot so students can pick it again.",
+    "unopenedHow3": "Teachers are not affected by this list — they still see every slot except the ones you closed in the section above.",
+    "unopenedSummaryClosed": "{{n}} not yet available",
+    "unopenedSummaryOpen": "{{n}} available",
+    "unopenedReopenAll": "Mark all as available (both segments)",
+    "unopenedGroupClosed": "Currently unavailable",
+    "unopenedGroupOpen": "Currently available",
+    "unopenedEmptyClosed": "No time slots are marked as unavailable for this segment. Tap any available slot below to hide it from student registration.",
+    "unopenedSegmentTabsLabel": "Choose which segment to manage",
+    "unopenedOn": "Unavailable",
+    "unopenedOff": "Available"
   },
 
   "segment": {
@@ -789,6 +824,11 @@
     "pageOf": "Page {{page}} of {{total}}",
     "goToLabel": "Go to page",
     "goToPlaceholder": "Go"
+  },
+
+  "timeSlot": {
+    "temporarilyComplete": "Temporarily complete",
+    "notYetOpen": "Not yet available"
   },
 
   "whatsapp": {

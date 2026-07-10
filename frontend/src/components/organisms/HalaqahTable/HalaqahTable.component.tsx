@@ -12,6 +12,7 @@ import { ProgressBar } from '../../atoms/ProgressBar';
 import { EyeIcon } from '../../atoms/Icon';
 import { StatusBadge } from '../../atoms/Badge';
 import { Pagination } from '../../molecules/Pagination';
+import { ClosedSlotBadge } from '../../molecules/ClosedSlotBadge';
 import { usePagination } from '../../../hooks/usePagination';
 import { getDisplayName } from '../../../lib/utils';
 import { halaqahTableStyles } from './HalaqahTable.style';
@@ -142,7 +143,13 @@ export function HalaqahTable({ halaqahs = [], loading = false, showActions = tru
                     : t('halaqah.notAssigned')}
                 </td>
                 <td className={halaqahTableStyles.bodyCellBold}>
-                  {halaqah.name}
+                  <span className="inline-flex items-center gap-2 flex-wrap">
+                    <span>{halaqah.name}</span>
+                    <ClosedSlotBadge
+                      schedule={halaqah.schedule}
+                      segment={halaqah.segment}
+                    />
+                  </span>
                 </td>
               </tr>
             ))}

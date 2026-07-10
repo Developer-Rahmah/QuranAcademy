@@ -26,6 +26,7 @@ import {
 } from '../components/templates/DashboardLayout';
 import { Card } from '../components/molecules/Card';
 import { Badge } from '../components/atoms/Badge';
+import { ClosedSlotBadge } from '../components/molecules/ClosedSlotBadge';
 import { Button } from '../components/atoms/Button';
 import { UsersIcon, VideoIcon } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
@@ -141,9 +142,15 @@ export function TeacherDashboard() {
                   >
                     <div className="flex flex-col gap-3 h-full">
                       <div className="flex items-start justify-between gap-3">
-                        <h3 className="text-base font-semibold text-foreground leading-snug">
-                          {halaqah.name}
-                        </h3>
+                        <div className="flex-1 flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-semibold text-foreground leading-snug">
+                            {halaqah.name}
+                          </h3>
+                          <ClosedSlotBadge
+                            schedule={halaqah.schedule}
+                            segment={halaqah.segment}
+                          />
+                        </div>
                         {segmentKey && (
                           <Badge variant="secondary" size="sm">
                             {t(segmentKey)}

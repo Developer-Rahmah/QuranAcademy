@@ -1,0 +1,41 @@
+-- ============================================================
+-- 0017_settings_unopened_slots
+--
+-- Adds an `unopened_slots` jsonb column to `public.settings`. The
+-- column stores a per-segment map of canonical time-slot ids the
+-- admin has marked as "not yet available", partitioned by gender:
+--
+--   { "men":      ["17-19", ...],
+--     "women":    ["07-09", ...],
+--     "children": ["15-17", ...] }
+--
+-- Semantically distinct from `completed_slots`:
+--   • completed_slots → the halaqahs for that slot are FULL. Teacher
+--     registration disables the slot so applicants pick another time.
+--   • unopened_slots  → no halaqah exists at that slot yet (nothing
+--     for students to join). Student registration disables the slot
+--     so applicants pick something with an actual halaqah behind it.
+--
+-- Segments honoured:
+--   • completed_slots → men / women (teacher-side; children teachers
+--     aren't gated by closures).
+--   • unopened_slots  → men / women / children (student-side; the
+--     children's programme has its own halaqahs, so it needs its
+--     own bucket).
+--
+-- Additive, non-breaking:
+--   • DEFAULT '{"men":[],"women":[],"children":[]}' — every existing
+--     row is immediately valid, no backfill, no NULL to handle
+--     downstream. Rows saved with a subset of keys still load
+--     cleanly (frontend defaults missing keys to []).
+--   • NOT NULL because callers treat missing keys as "no gating".
+--     Empty arrays carry the same semantic and avoid null-branching
+--     everywhere.
+--   • IF NOT EXISTS so re-running is safe.
+--
+-- Idempotent — safe to re-run.
+-- ============================================================
+
+ALTER TABLE IF EXISTS public.settings
+  ADD COLUMN IF NOT EXISTS unopened_slots jsonb
+    NOT NULL DEFAULT '{"men":[],"women":[],"children":[]}'::jsonb;

@@ -2,9 +2,10 @@
  * RegistrationForm Component
  * Student and Teacher registration forms with toast notifications
  */
-import { useState, FormEvent, ChangeEvent } from 'react';
+import { useMemo, useState, FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import { useSettings } from '../../../context/SettingsContext';
 import { useToast } from '../../../context/ToastContext';
 import { useTranslation } from '../../../locales/i18n';
 import { Button } from '../../atoms/Button';
@@ -52,6 +53,10 @@ export function StudentRegistrationForm() {
   const navigate = useNavigate();
   const { signUp, loading } = useAuth();
   const toast = useToast();
+  // Admin-marked "not yet available" slots (per segment). Only the
+  // student form honours this — the teacher form has its own,
+  // separate "temporarily complete" gating (see below).
+  const { unopenedSlots } = useSettings();
 
   const [formData, setFormData] = useState<StudentFormData>({
     first_name: '',
@@ -82,14 +87,39 @@ export function StudentRegistrationForm() {
     }
   };
 
+  // Unopened slots are per-segment: pick the Set that matches the
+  // student's currently selected segment. Children has its own
+  // bucket on the admin side, so `children` students see a
+  // separately-managed list of unavailable slots — not the adult
+  // ones. Any other unknown segment falls through to empty.
+  const activeUnopenedSlots = useMemo<ReadonlySet<string>>(() => {
+    if (formData.segment === USER_SEGMENTS.MEN) return unopenedSlots.men;
+    if (formData.segment === USER_SEGMENTS.WOMEN) return unopenedSlots.women;
+    if (formData.segment === USER_SEGMENTS.CHILDREN) return unopenedSlots.children;
+    return new Set<string>();
+  }, [unopenedSlots, formData.segment]);
+
   // Segment drives role label + enforced defaults (student_type).
   // Cascading here keeps the form from submitting an invalid combination
   // like segment='men' + student_type='woman'.
+  //
+  // Also drops any picked slots that are unopened for the NEW segment
+  // so the picker never carries a stale selection under a mismatched
+  // "not yet available" pill.
   const handleSegmentChange = (next: UserSegment) => {
+    const nextClosed =
+      next === USER_SEGMENTS.MEN
+        ? unopenedSlots.men
+        : next === USER_SEGMENTS.WOMEN
+          ? unopenedSlots.women
+          : next === USER_SEGMENTS.CHILDREN
+            ? unopenedSlots.children
+            : new Set<string>();
     setFormData((prev) => ({
       ...prev,
       segment: next,
       student_type: defaultStudentTypeForSegment(next),
+      available_times: prev.available_times.filter((id) => !nextClosed.has(id)),
     }));
   };
 
@@ -132,6 +162,11 @@ export function StudentRegistrationForm() {
 
     if (formData.available_times.length === 0) {
       newErrors.available_times = t('validation.timeSlotsRequired');
+    } else if (formData.available_times.some((id) => activeUnopenedSlots.has(id))) {
+      // Defence-in-depth: the picker already disables unopened slots
+      // for the current segment, but a stale cache or tampered payload
+      // could still slip one through. Reject with a clear message.
+      newErrors.available_times = t('validation.timeSlotNotYetOpen');
     }
 
     if (!formData.agreed) {
@@ -371,6 +406,13 @@ export function StudentRegistrationForm() {
           onChange={(value) => handleChange('available_times', value)}
           error={errors.available_times}
           multiple={false}
+          // Student registration honours the admin-managed "not yet
+          // available" list — slots with no halaqah at all yet render
+          // disabled + labelled so the applicant picks something with
+          // an actual halaqah behind it. Set is per-segment; empty for
+          // children (no gating there).
+          completedSlotIds={activeUnopenedSlots}
+          completedSlotLabelKey="timeSlot.notYetOpen"
         />
       </FormSection>
 
@@ -411,6 +453,9 @@ export function TeacherRegistrationForm() {
   const navigate = useNavigate();
   const { signUp, loading } = useAuth();
   const toast = useToast();
+  // Admin-managed slot closures. Teacher form only — student
+  // registration remains open at any time.
+  const { completedSlots } = useSettings();
 
   const [formData, setFormData] = useState<TeacherFormData>({
     first_name: '',
@@ -443,14 +488,38 @@ export function TeacherRegistrationForm() {
     }
   };
 
+  // Closures are per-segment: pick the Set that matches the currently
+  // selected gender. `children` (and any other non-gendered segment)
+  // is intentionally unaffected — no closures apply, so an empty set
+  // makes every slot pickable. Memoised because it's the identity used
+  // by TimeSlotSelector to decide which slots to disable.
+  const activeCompletedSlots = useMemo<ReadonlySet<string>>(() => {
+    if (formData.segment === USER_SEGMENTS.MEN) return completedSlots.men;
+    if (formData.segment === USER_SEGMENTS.WOMEN) return completedSlots.women;
+    return new Set<string>();
+  }, [completedSlots, formData.segment]);
+
   // Teacher audience is constrained by segment (see lib/segment.ts).
   // Switching segment resets the audience to a valid default so the form
   // never carries a stale value like 'women' after selecting 'men'.
+  //
+  // Also drops any already-picked slots that are closed for the NEW
+  // segment: e.g. an applicant picks 7-9 PM as a women's teacher, then
+  // flips to men's — if 7-9 PM is closed on the men's side, silently
+  // remove it so the picker + validation stay consistent instead of
+  // showing a stale "temporarily complete" pill on a selected slot.
   const handleSegmentChange = (next: UserSegment) => {
+    const nextClosed =
+      next === USER_SEGMENTS.MEN
+        ? completedSlots.men
+        : next === USER_SEGMENTS.WOMEN
+          ? completedSlots.women
+          : new Set<string>();
     setFormData((prev) => ({
       ...prev,
       segment: next,
       preferred_audience: segmentationRules.getDefaultAudience(next) as PreferredAudienceUI,
+      available_times: prev.available_times.filter((id) => !nextClosed.has(id)),
     }));
   };
 
@@ -502,6 +571,12 @@ export function TeacherRegistrationForm() {
 
     if (formData.available_times.length === 0) {
       newErrors.available_times = t('validation.timeSlotsRequired');
+    } else if (formData.available_times.some((id) => activeCompletedSlots.has(id))) {
+      // Defence-in-depth: the picker already disables closed slots,
+      // but a stale cache or a tampered payload could still slip one
+      // through. Reject with a clear message so the applicant knows
+      // to reopen the picker.
+      newErrors.available_times = t('validation.timeSlotClosed');
     }
 
     if (!formData.agreed) {
@@ -743,20 +818,33 @@ export function TeacherRegistrationForm() {
         />
       </FormSection>
 
-      <FormSection title={t('registration.availableTimes')}>
+      <FormSection title={t('registration.availableTime')}>
         <p className={registrationFormStyles.timeSlotInfo}>
-          {t('registration.selectAvailableTimes')}
+          {t('registration.selectAvailableTime')}
         </p>
         <TimeSlotSelector
           value={formData.available_times}
           onChange={(value) => handleChange('available_times', value)}
           error={errors.available_times}
+          // Teachers commit to ONE slot at registration — one
+          // applicant = one halaqah at activation. Additional slots
+          // (if any) can be granted later by the admin editing the
+          // profile directly.
+          multiple={false}
+          // Teacher registration is the ONLY surface that honours the
+          // admin-managed closures, and the set is picked by the
+          // applicant's currently-selected segment: men's closures
+          // don't disable slots for a women's teacher and vice versa.
+          // `children` and other non-gendered segments pass an empty
+          // set so every slot stays open. Student registration
+          // doesn't pass the prop so students remain unaffected.
+          completedSlotIds={activeCompletedSlots}
         />
       </FormSection>
 
       <div className={registrationFormStyles.agreement.wrapper}>
         <Checkbox
-          label={t('registration.agreement')}
+          label={t('registration.agreementTeacher')}
           checked={formData.agreed}
           onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('agreed', e.target.checked)}
           error={!!errors.agreed}

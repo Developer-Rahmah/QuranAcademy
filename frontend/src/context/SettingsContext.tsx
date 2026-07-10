@@ -42,6 +42,33 @@ interface SettingsContextValue {
   academyName: string;
   /** Locale-aware academy description (falls back to i18n). */
   academyDescription: string;
+  /**
+   * Slot ids the admin has marked "temporarily complete", split per
+   * gender segment. Exposed as Sets for O(1) `has()` lookups from the
+   * time-slot picker; only teacher registration should consult this —
+   * student registration is intentionally unaffected. Consumers pick
+   * the appropriate side based on the applicant's / halaqah's
+   * segment; `children` and unset segments are unaffected by closures.
+   */
+  completedSlots: {
+    men: Set<string>;
+    women: Set<string>;
+  };
+  /**
+   * Slot ids marked "not yet available" for students, per gender
+   * segment. Semantically distinct from `completedSlots`: an unopened
+   * slot has no halaqah at all yet (nothing for students to join),
+   * while a completed slot's halaqahs are full. Only student
+   * registration reads this.
+   *
+   * Includes a `children` bucket (adult-only closures don't need
+   * this, so it lives on the student side alone).
+   */
+  unopenedSlots: {
+    men: Set<string>;
+    women: Set<string>;
+    children: Set<string>;
+  };
   /** Manually re-pull from the DB (e.g. after an admin saves edits). */
   reload: () => Promise<void>;
 }
@@ -93,12 +120,24 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       (isArabic ? raw.academy_description_ar : raw.academy_description_en) ||
       t('academy.description');
 
+    const completedSlots = {
+      men: new Set(raw.completed_slots?.men ?? []),
+      women: new Set(raw.completed_slots?.women ?? []),
+    };
+    const unopenedSlots = {
+      men: new Set(raw.unopened_slots?.men ?? []),
+      women: new Set(raw.unopened_slots?.women ?? []),
+      children: new Set(raw.unopened_slots?.children ?? []),
+    };
+
     return {
       loading,
       raw,
       contact,
       academyName,
       academyDescription,
+      completedSlots,
+      unopenedSlots,
       reload,
     };
   }, [raw, loading, language, t, reload]);

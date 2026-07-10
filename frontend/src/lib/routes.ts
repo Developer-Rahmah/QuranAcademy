@@ -49,6 +49,11 @@ export function adminUserDetailPath(userId: string): string {
   return `/admin/users/${userId}`;
 }
 
+/** Build a /halaqah/:id URL from a halaqah id. */
+export function halaqahDetailPath(halaqahId: string): string {
+  return `/halaqah/${halaqahId}`;
+}
+
 /**
  * Given a role, return the URL they should land on after login.
  *

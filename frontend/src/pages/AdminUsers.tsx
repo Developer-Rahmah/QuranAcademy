@@ -3,10 +3,10 @@
  * Allows viewing, activating, and suspending user accounts
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../lib/supabase';
 import { supabase } from '../lib/supabase/client';
-import { adminUserDetailPath } from '../lib/routes';
+import { adminUserDetailPath, halaqahDetailPath } from '../lib/routes';
 import { segmentationRules } from '../lib/segmentationRules';
 // AdminUsers is a MIXED context (admin manages everyone), so plural
 // labels like "students" / "teachers" resolve to the neutral variant.
@@ -149,6 +149,16 @@ export function AdminUsers() {
   // No N+1, no per-row queries.
   const [assignedStudentIds, setAssignedStudentIds] = useState<Set<string>>(new Set());
   const [teachersWithHalaqah, setTeachersWithHalaqah] = useState<Set<string>>(new Set());
+  // Per-user halaqah lookup — feeds the "Halaqah" column in the
+  // table. Built off the same halaqahs + memberships fetch as the
+  // assignment sets above, so no extra queries. A user may have 0-N
+  // halaqahs:
+  //   • student → one entry per active membership row
+  //   • teacher → one entry per halaqah they own (any status)
+  //   • everyone else → not in the map at all
+  const [halaqahsByUser, setHalaqahsByUser] = useState<
+    Map<string, ReadonlyArray<{ id: string; name: string }>>
+  >(new Map());
   // Server-side pagination state. The main user query fetches PAGE_SIZE
   // rows at a time and returns the academy-wide total via
   // `count: 'exact'` so the pager can render "Page X of N". The pool
@@ -230,27 +240,66 @@ export function AdminUsers() {
             )
             .eq('role', 'teacher')
             .eq('status', 'active'),
-          // halaqah_members: just student_id of active memberships.
+          // halaqah_members: student_id + halaqah_id so we can both
+          // populate the assignment set AND look up which halaqah the
+          // student belongs to (drives the new "Halaqah" column).
           supabase
             .from('halaqah_members')
-            .select('student_id')
+            .select('student_id, halaqah_id')
             .eq('status', 'active'),
-          // halaqahs: just teacher_id (any status, see note above).
-          supabase.from('halaqahs').select('teacher_id'),
+          // halaqahs: id + name + teacher_id. `id` and `name` drive
+          // the Halaqah column links; `teacher_id` drives the
+          // assignment set + per-teacher lookup.
+          supabase.from('halaqahs').select('id, name, teacher_id'),
         ]);
 
       setStudentsPool((studentsRes.data ?? []) as Profile[]);
       setTeachersPool((teachersRes.data ?? []) as Profile[]);
 
-      const memberRows = (membershipsRes.data ?? []) as Array<{ student_id: string | null }>;
+      const memberRows = (membershipsRes.data ?? []) as Array<{
+        student_id: string | null;
+        halaqah_id: string | null;
+      }>;
       setAssignedStudentIds(
         new Set(memberRows.map((m) => m.student_id).filter((id): id is string => !!id)),
       );
 
-      const halaqahRows = (halaqahsRes.data ?? []) as Array<{ teacher_id: string | null }>;
+      const halaqahRows = (halaqahsRes.data ?? []) as Array<{
+        id: string | null;
+        name: string | null;
+        teacher_id: string | null;
+      }>;
       setTeachersWithHalaqah(
         new Set(halaqahRows.map((h) => h.teacher_id).filter((id): id is string => !!id)),
       );
+
+      // Build the per-user halaqah lookup. One id → halaqah map so
+      // each membership row resolves in O(1) without another fetch,
+      // then two passes: memberships for students, direct
+      // teacher_id grouping for teachers. A single Map with both
+      // sides keeps the table lookup trivial regardless of role.
+      const halaqahById = new Map<string, { id: string; name: string }>();
+      for (const h of halaqahRows) {
+        if (h.id && h.name) halaqahById.set(h.id, { id: h.id, name: h.name });
+      }
+      const userToHalaqahs = new Map<string, Array<{ id: string; name: string }>>();
+      // Students → resolve halaqah_id through the map.
+      for (const m of memberRows) {
+        if (!m.student_id || !m.halaqah_id) continue;
+        const h = halaqahById.get(m.halaqah_id);
+        if (!h) continue;
+        const list = userToHalaqahs.get(m.student_id) ?? [];
+        list.push(h);
+        userToHalaqahs.set(m.student_id, list);
+      }
+      // Teachers → group halaqahs directly by teacher_id.
+      for (const h of halaqahRows) {
+        if (!h.teacher_id || !h.id || !h.name) continue;
+        const list = userToHalaqahs.get(h.teacher_id) ?? [];
+        list.push({ id: h.id, name: h.name });
+        userToHalaqahs.set(h.teacher_id, list);
+      }
+      setHalaqahsByUser(userToHalaqahs);
     } catch (err) {
       console.error('Error fetching pools:', err);
       // Best-effort: a failure leaves the badge counts empty but the
@@ -815,6 +864,7 @@ export function AdminUsers() {
                   <th className={styles.tableHeadCell}>{t('registration.phone')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.role')}</th>
                   <th className={styles.tableHeadCell}>{t('segment.label')}</th>
+                  <th className={styles.tableHeadCell}>{t('halaqah.halaqahName')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.status')}</th>
                   <th className={styles.tableHeadCell}>{t('matching.columnHeader')}</th>
                   <th className={styles.tableHeadCell}>{t('admin.actions')}</th>
@@ -884,6 +934,45 @@ export function AdminUsers() {
                       {user.segment
                         ? t(`segment.${user.segment === 'non_arab_speakers' ? 'nonArabSpeakers' : user.segment}`)
                         : '-'}
+                    </td>
+                    <td
+                      className={styles.tableCell}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Halaqah column. Renders one clickable link per
+                          halaqah the user belongs to (student side) or
+                          owns (teacher side). Empty for admins /
+                          supervisor_managers who aren't in the map at
+                          all. stopPropagation on the cell keeps the row-
+                          level navigate-to-user-detail from firing when
+                          the admin taps the link. */}
+                      {(() => {
+                        const list = halaqahsByUser.get(user.id) ?? [];
+                        if (list.length === 0) {
+                          return (
+                            <span className={styles.tableCellMuted}>
+                              {t('halaqah.notAssigned')}
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-x-2 gap-y-1">
+                            {list.map((h, idx) => (
+                              <span key={h.id} className="whitespace-nowrap">
+                                <Link
+                                  to={halaqahDetailPath(h.id)}
+                                  className="text-primary hover:underline"
+                                >
+                                  {h.name}
+                                </Link>
+                                {idx < list.length - 1 && (
+                                  <span className={styles.tableCellMuted}>،</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className={styles.tableCell}>
                       <StatusBadge status={user.status as 'active' | 'pending' | 'suspended'} />

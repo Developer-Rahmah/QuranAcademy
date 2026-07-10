@@ -15,6 +15,7 @@ import { cn } from '../../../lib/utils';
 import { useTranslation } from '../../../locales/i18n';
 import { TIME_SLOTS } from '../../../lib/constants';
 import { formatSlotRange } from '../../../lib/time';
+import { Badge } from '../../atoms/Badge';
 import { timeSlotSelectorStyles, timeSlotDisplayStyles } from './TimeSlotSelector.style';
 import type { TimeSlotSelectorProps, TimeSlotDisplayProps } from './TimeSlotSelector.types';
 
@@ -28,11 +29,18 @@ export function TimeSlotSelector({
   error,
   className,
   multiple = true,
+  completedSlotIds,
+  completedSlotLabelKey = 'timeSlot.temporarilyComplete',
 }: TimeSlotSelectorProps) {
-  const { language } = useTranslation();
+  const { t, language } = useTranslation();
 
   const handleToggle = (slotId: string) => {
     if (disabled) return;
+    // Closed slots are non-interactive; defence-in-depth against a
+    // programmatic call sneaking through (the button is already
+    // disabled, but keep the guard so the payload can never carry
+    // a closed slot).
+    if (completedSlotIds?.has(slotId)) return;
 
     const isSelected = value.includes(slotId);
     let newValue: string[];
@@ -50,23 +58,35 @@ export function TimeSlotSelector({
       <div className={timeSlotSelectorStyles.grid}>
         {TIME_SLOTS.map((slot) => {
           const isSelected = value.includes(slot.id);
+          const isCompleted = !!completedSlotIds?.has(slot.id);
 
           return (
             <button
               key={slot.id}
               type="button"
-              disabled={disabled}
+              disabled={disabled || isCompleted}
               onClick={() => handleToggle(slot.id)}
+              // aria-disabled communicates the completed state to
+              // screen readers even though the button is also
+              // physically disabled.
+              aria-disabled={disabled || isCompleted}
               className={cn(
                 timeSlotSelectorStyles.slot.base,
                 timeSlotSelectorStyles.slot.focus,
-                isSelected
+                isCompleted
+                  ? timeSlotSelectorStyles.slot.completed
+                  : isSelected
                   ? timeSlotSelectorStyles.slot.selected
                   : timeSlotSelectorStyles.slot.unselected,
-                disabled && timeSlotSelectorStyles.slot.disabled
+                disabled && !isCompleted && timeSlotSelectorStyles.slot.disabled,
               )}
             >
-              {formatSlotRange(slot.id, language)}
+              <span>{formatSlotRange(slot.id, language)}</span>
+              {isCompleted && (
+                <Badge variant="warning" size="sm">
+                  {t(completedSlotLabelKey)}
+                </Badge>
+              )}
             </button>
           );
         })}
