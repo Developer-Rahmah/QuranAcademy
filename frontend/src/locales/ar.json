@@ -786,7 +786,9 @@
     "label": "ترقيم الصفحات",
     "prev": "السابق",
     "next": "التالي",
-    "pageOf": "صفحة {{page}} من {{total}}"
+    "pageOf": "صفحة {{page}} من {{total}}",
+    "goToLabel": "الانتقال إلى صفحة",
+    "goToPlaceholder": "انتقال"
   },
 
   "whatsapp": {

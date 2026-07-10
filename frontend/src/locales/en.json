@@ -786,7 +786,9 @@
     "label": "Pagination",
     "prev": "Previous",
     "next": "Next",
-    "pageOf": "Page {{page}} of {{total}}"
+    "pageOf": "Page {{page}} of {{total}}",
+    "goToLabel": "Go to page",
+    "goToPlaceholder": "Go"
   },
 
   "whatsapp": {
