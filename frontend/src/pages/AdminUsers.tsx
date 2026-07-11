@@ -18,6 +18,7 @@ import { Select } from '../components/atoms/Select';
 import { StatusBadge, Badge } from '../components/atoms/Badge';
 import { UsersIcon, TeacherIcon, CheckIcon } from '../components/atoms/Icon';
 import { MatchingBadge } from '../components/molecules/MatchingBadge';
+import { TimeSlotDisplay } from '../components/molecules/TimeSlotSelector';
 import { Pagination } from '../components/molecules/Pagination';
 import { buildMatchIndex, findMatches } from '../lib/matching';
 import {
@@ -982,11 +983,39 @@ export function AdminUsers() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       {user.role === 'student' || user.role === 'teacher' ? (
-                        <MatchingBadge
-                          matches={matchesFor(user)}
-                          subjectRole={user.role}
-                          to={adminUserDetailPath}
-                        />
+                        (() => {
+                          const rowMatches = matchesFor(user);
+                          // No-match rows expose the user's own time
+                          // slots inline so the admin can see WHY there's
+                          // no pair (usually a slot-clash) without
+                          // clicking through to the profile. Rows WITH
+                          // matches keep the compact badge — the popover
+                          // already lists the shared slots.
+                          if (rowMatches.length === 0) {
+                            return (
+                              <div className="space-y-2">
+                                <MatchingBadge
+                                  matches={rowMatches}
+                                  subjectRole={user.role}
+                                  to={adminUserDetailPath}
+                                />
+                                {user.available_times &&
+                                  user.available_times.length > 0 && (
+                                    <TimeSlotDisplay
+                                      slots={user.available_times}
+                                    />
+                                  )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <MatchingBadge
+                              matches={rowMatches}
+                              subjectRole={user.role}
+                              to={adminUserDetailPath}
+                            />
+                          );
+                        })()
                       ) : (
                         <span className={styles.tableCellMuted}>-</span>
                       )}
