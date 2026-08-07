@@ -22,7 +22,8 @@ import {
   type ReactNode,
 } from 'react';
 import { api } from '../lib/supabase';
-import type { SettingsMap } from '../lib/supabase/api/settings';
+import type { SettingsMap, ReportPolicy } from '../lib/supabase/api/settings';
+import { REPORT_POLICY_DEFAULT } from '../lib/supabase/api/settings';
 import { CONTACT_INFO } from '../lib/constants';
 import { useTranslation } from '../locales/i18n';
 
@@ -69,6 +70,13 @@ interface SettingsContextValue {
     women: Set<string>;
     children: Set<string>;
   };
+  /**
+   * Automatic student-suspension policy. Always populated (falls
+   * back to `REPORT_POLICY_DEFAULT` when the settings row is empty
+   * or the column is missing) so consumers can render without
+   * null-branching.
+   */
+  reportPolicy: ReportPolicy;
   /** Manually re-pull from the DB (e.g. after an admin saves edits). */
   reload: () => Promise<void>;
 }
@@ -129,6 +137,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       women: new Set(raw.unopened_slots?.women ?? []),
       children: new Set(raw.unopened_slots?.children ?? []),
     };
+    const reportPolicy: ReportPolicy = raw.report_policy ?? { ...REPORT_POLICY_DEFAULT };
 
     return {
       loading,
@@ -138,6 +147,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       academyDescription,
       completedSlots,
       unopenedSlots,
+      reportPolicy,
       reload,
     };
   }, [raw, loading, language, t, reload]);

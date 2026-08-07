@@ -13,6 +13,8 @@
  * `reload()` so the rest of the app sees new values immediately.
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../lib/routes';
 import { DashboardLayout, PageSection } from '../components/templates/DashboardLayout';
 import { Card, CardContent } from '../components/molecules/Card';
 import { FormField } from '../components/molecules/FormField';
@@ -20,11 +22,12 @@ import { Button } from '../components/atoms/Button';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from '../locales/i18n';
-import { settingsApi } from '../lib/supabase/api/settings';
-import type { SettingsMap } from '../lib/supabase/api/settings';
+import { settingsApi, REPORT_POLICY_DEFAULT } from '../lib/supabase/api/settings';
+import type { SettingsMap, ReportPolicy } from '../lib/supabase/api/settings';
 import { TIME_SLOTS } from '../lib/constants';
 import { formatSlotRange } from '../lib/time';
 import { cn } from '../lib/utils';
+import { ReportPolicyPanel } from '../components/molecules/ReportPolicyPanel';
 
 /**
  * Only the string-valued settings fields live in the form. Non-string
@@ -405,6 +408,14 @@ export function AdminSettings() {
   // closures. The draft still ships in the payload so the API
   // always writes a uniform SegmentedSlotMap shape.
   const [childrenUnopenedSlots, setChildrenUnopenedSlots] = useState<Set<string>>(new Set());
+  // Report-policy draft. Kept in local state to defer persistence to
+  // the shared Save button — mirrors how every other section works.
+  // Validity is tracked separately so the panel can gate saves
+  // without owning the disable logic itself.
+  const [reportPolicyDraft, setReportPolicyDraft] = useState<ReportPolicy>({
+    ...REPORT_POLICY_DEFAULT,
+  });
+  const [reportPolicyValid, setReportPolicyValid] = useState<boolean>(true);
 
   // Sync form state whenever SettingsContext hydrates or reloads.
   useEffect(() => {
@@ -424,6 +435,7 @@ export function AdminSettings() {
     setMenUnopenedSlots(new Set(raw.unopened_slots?.men ?? []));
     setWomenUnopenedSlots(new Set(raw.unopened_slots?.women ?? []));
     setChildrenUnopenedSlots(new Set(raw.unopened_slots?.children ?? []));
+    setReportPolicyDraft(raw.report_policy ?? { ...REPORT_POLICY_DEFAULT });
   }, [raw]);
 
   const setField = (key: keyof FormState, value: string) => {
@@ -458,6 +470,7 @@ export function AdminSettings() {
         women: Array.from(womenUnopenedSlots),
         children: Array.from(childrenUnopenedSlots),
       };
+      patch.report_policy = reportPolicyDraft;
 
       const { error } = await settingsApi.update(patch);
       if (error) {
@@ -588,8 +601,49 @@ export function AdminSettings() {
           language={language}
         />
 
+        {/* Automatic student-suspension policy. The scheduler in
+            migration 0021 reads directly from `settings.report_policy`;
+            this section is the only editor for that column. */}
+        <PageSection title={t('adminSettings.reportPolicy.title')}>
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <ReportPolicyPanel
+                value={reportPolicyDraft}
+                onChange={setReportPolicyDraft}
+                onValidityChange={setReportPolicyValid}
+              />
+              {/* Read-only preview: what WOULD suspend today under
+                  the CURRENTLY-SAVED policy. Uses the same
+                  `report_policy_evaluation` view the scheduler
+                  reads, so admins can verify the outcome before
+                  enabling the toggle. Nothing on the preview page
+                  mutates data. */}
+              <div className="rounded-lg border border-border bg-muted/5 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('adminSettings.reportPolicy.previewCtaTitle')}
+                  </p>
+                  <p className="text-xs text-muted mt-1">
+                    {t('adminSettings.reportPolicy.previewCtaHint')}
+                  </p>
+                </div>
+                <Link
+                  to={ROUTES.adminReportPolicyPreview}
+                  className="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                >
+                  {t('adminSettings.reportPolicy.previewCtaLink')}
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </PageSection>
+
         <div className="flex justify-end">
-          <Button type="submit" loading={saving}>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={!reportPolicyValid}
+          >
             {t('adminSettings.save')}
           </Button>
         </div>

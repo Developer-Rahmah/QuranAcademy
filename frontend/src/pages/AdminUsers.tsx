@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { db } from '../lib/supabase';
+import { db, api } from '../lib/supabase';
 import { supabase } from '../lib/supabase/client';
 import { adminUserDetailPath, halaqahDetailPath } from '../lib/routes';
 import { segmentationRules } from '../lib/segmentationRules';
@@ -477,7 +477,16 @@ export function AdminUsers() {
     }
     setActionLoading(userId);
     try {
-      const { error } = await db.profiles.update(userId, { status: newStatus });
+      // Route ALL status flips through the audited RPC so
+      // `status_change_audit` always captures who/what/why. Both
+      // students and teacher / supervisor_manager / halaqah_supervisor
+      // targets are legal here — the RPC enforces target scope
+      // server-side (only admin can flip org-level accounts).
+      const { error } = await api.profiles.setStudentStatus(
+        userId,
+        newStatus,
+        'admin_users',
+      );
 
       if (error) {
         console.error('Error updating user:', error);

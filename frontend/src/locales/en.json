@@ -529,7 +529,101 @@
     "unopenedEmptyClosed": "No time slots are marked as unavailable for this segment. Tap any available slot below to hide it from student registration.",
     "unopenedSegmentTabsLabel": "Choose which segment to manage",
     "unopenedOn": "Unavailable",
-    "unopenedOff": "Available"
+    "unopenedOff": "Available",
+    "reportPolicy": {
+      "title": "Student Report Policy",
+      "enableLabel": "Automatically suspend students who stop submitting reports",
+      "enableHint": "When ON, a daily scheduler checks every active student and suspends anyone whose latest report is older than the grace period below. When OFF, the scheduler exits without touching any account.",
+      "gracePeriodLabel": "Grace period",
+      "gracePeriodHint": "Number of days without a submitted report before a student is automatically suspended.",
+      "dayPreset": "{{n}} days",
+      "custom": "Custom",
+      "customPlaceholder": "Days",
+      "errors": {
+        "required": "Enter the number of days.",
+        "integer": "Enter a whole number.",
+        "positive": "Grace period must be a positive whole number."
+      },
+      "previewCtaTitle": "Preview who would be suspended today",
+      "previewCtaHint": "Read-only. Shows the students that the scheduler would suspend under the current grace period. Nothing is modified.",
+      "previewCtaLink": "Open preview"
+    }
+  },
+
+  "reportPolicyPreview": {
+    "title": "Automatic suspension preview",
+    "subtitle": "Read-only view of the students that would be automatically suspended today under the current report policy.",
+    "readOnlyBadge": "Read-only — no data is modified",
+    "mode": "Show",
+    "modeOnlySuspend": "Only students who would be suspended today",
+    "modeAll": "All students (with classification)",
+    "reasonFilter": "Reason",
+    "wouldSuspendCount": "Would suspend today ({{n}})",
+    "allCount": "All students ({{n}})",
+    "emptyWouldSuspend": "No students would be suspended under the current policy.",
+    "columns": {
+      "student": "Student",
+      "halaqah": "Halaqah",
+      "teacher": "Teacher",
+      "lastReport": "Last report",
+      "referenceDate": "Reference date",
+      "daysSince": "Days since",
+      "reason": "Reason"
+    },
+    "reason": {
+      "ALREADY_SUSPENDED": "Already suspended",
+      "PENDING": "Pending activation",
+      "NO_HALAQAH": "No halaqah",
+      "INACTIVE_HALAQAH": "Halaqah not active",
+      "NO_REPORTS_YET": "No reports yet",
+      "HAS_REPORTS": "Has reports"
+    }
+  },
+
+  "adminAudit": {
+    "title": "Status change audit",
+    "subtitle": "Every activation and deactivation across the academy — manual or automatic.",
+    "entries": "Entries",
+    "actorScheduler": "Automatic Scheduler",
+    "actorUnknown": "Unknown",
+    "filters": {
+      "from": "From",
+      "to": "To",
+      "student": "Student",
+      "source": "Source",
+      "reason": "Reason",
+      "newStatus": "New status"
+    },
+    "columns": {
+      "at": "When",
+      "student": "Student",
+      "transition": "Transition",
+      "source": "Source",
+      "reason": "Reason",
+      "changedBy": "Changed by"
+    },
+    "source": {
+      "admin_users": "Admin Users",
+      "halaqah_details": "Halaqah Details",
+      "supervisor_dashboard": "Supervisor Dashboard",
+      "automatic_scheduler": "Automatic Scheduler",
+      "system": "System"
+    },
+    "reason": {
+      "manual_suspension": "Manual Suspension",
+      "manual_activation": "Manual Activation",
+      "automatic_suspension": "Automatic Suspension",
+      "automatic_reactivation": "Automatic Reactivation"
+    }
+  },
+
+  "suspensionWidget": {
+    "title": "Suspensions & Activations",
+    "viewAudit": "View full audit",
+    "suspendedToday": "Suspended today",
+    "automaticLast7": "Auto-suspended (last 7 days)",
+    "manualLast7": "Manually suspended (last 7 days)",
+    "approaching": "Approaching suspension (≤ {{n}} days)"
   },
 
   "segment": {

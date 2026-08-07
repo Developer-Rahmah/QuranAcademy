@@ -29,6 +29,18 @@ export const ROUTES = {
   adminUserDetail: '/admin/users/:id',
   adminSettings: '/admin/settings',
   adminMatching: '/admin/matching',
+  /**
+   * Status-change audit log. Admin + supervisor_manager only.
+   * Every activation / deactivation lands here regardless of
+   * source (manual buttons or the automatic scheduler).
+   */
+  adminAudit: '/admin/audit',
+  /**
+   * Read-only preview of students who would be automatically
+   * suspended today under the current report policy. Admin +
+   * supervisor_manager only.
+   */
+  adminReportPolicyPreview: '/admin/report-policy-preview',
   halaqahDetails: '/halaqah/:id',
   reportNew: '/report/new',
   reportEdit: '/report/:id/edit',

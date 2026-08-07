@@ -80,7 +80,38 @@ export interface SettingsMap {
    * this — teacher registration is intentionally unaffected.
    */
   unopened_slots?: SegmentedSlotMap;
+  /**
+   * Automatic student-suspension policy driven by the daily
+   * scheduler (migrations 0021 / 0022). Backed by
+   * `settings.report_policy` (jsonb).
+   *
+   *   • enabled=false     → scheduler exits without acting.
+   *   • grace_period_days → whole positive integer; a student's
+   *                         "days since latest report" must
+   *                         STRICTLY exceed this to be suspended.
+   *
+   * Missing / malformed values collapse to the safe defaults
+   * (disabled, 7 days) at the load boundary — downstream code
+   * never has to defensively branch on undefined.
+   */
+  report_policy?: ReportPolicy;
 }
+
+/**
+ * Automatic-suspension policy shape. Mirrors the jsonb column
+ * default exactly so freshly-created rows and freshly-parsed
+ * runtime values agree byte-for-byte.
+ */
+export interface ReportPolicy {
+  enabled: boolean;
+  grace_period_days: number;
+}
+
+/** Safe defaults used when the column is missing or malformed. */
+export const REPORT_POLICY_DEFAULT: ReportPolicy = {
+  enabled: false,
+  grace_period_days: 7,
+};
 
 /**
  * Per-segment slot lists. Kept as arrays here so the wire shape
@@ -116,11 +147,12 @@ const KNOWN_STRING_KEYS = [
   'complaints_telegram_username',
 ] as const;
 
-/** Union of all recognised keys — string OR segmented-slot map. */
+/** Union of all recognised keys — string OR jsonb-shaped. */
 const KNOWN_KEYS: ReadonlyArray<keyof SettingsMap> = [
   ...KNOWN_STRING_KEYS,
   'completed_slots',
   'unopened_slots',
+  'report_policy',
 ];
 
 /** Jsonb-shaped settings keys (both use the same segmented-map shape). */
@@ -211,6 +243,34 @@ function safeCompletedSlots(v: unknown): SegmentedSlotMap {
 }
 
 /**
+ * Coerce an unknown value into a `ReportPolicy`.
+ *
+ * Rejects anything that doesn't produce a valid `{enabled, grace_period_days}`
+ * pair — including negatives, zero, non-integers, and non-boolean flags —
+ * by falling back to `REPORT_POLICY_DEFAULT`. This is the LAST line of
+ * defence before the value hits UI code / the scheduler function; UI
+ * input validation still runs client-side so users get feedback.
+ */
+function safeReportPolicy(v: unknown): ReportPolicy {
+  if (typeof v === 'string' && v.trim().length > 0) {
+    try {
+      return safeReportPolicy(JSON.parse(v));
+    } catch {
+      return { ...REPORT_POLICY_DEFAULT };
+    }
+  }
+  if (!v || typeof v !== 'object') return { ...REPORT_POLICY_DEFAULT };
+  const obj = v as Record<string, unknown>;
+  const enabled = typeof obj.enabled === 'boolean' ? obj.enabled : REPORT_POLICY_DEFAULT.enabled;
+  const raw = obj.grace_period_days;
+  const grace =
+    typeof raw === 'number' && Number.isFinite(raw) && Number.isInteger(raw) && raw > 0
+      ? raw
+      : REPORT_POLICY_DEFAULT.grace_period_days;
+  return { enabled, grace_period_days: grace };
+}
+
+/**
  * Read, normalize, and return the current settings map. Missing rows/columns
  * or RLS failures all yield `{}`. Individual null columns collapse to ''.
  *
@@ -238,6 +298,8 @@ async function load(): Promise<SettingsMap> {
         (out as Record<string, string>)[key] = safeString(row.value);
       } else if ((SEGMENTED_MAP_KEYS as readonly string[]).includes(key)) {
         (out as Record<string, SegmentedSlotMap>)[key] = safeCompletedSlots(row.value);
+      } else if (key === 'report_policy') {
+        out.report_policy = safeReportPolicy(row.value);
       }
     }
     return out;
@@ -252,6 +314,7 @@ async function load(): Promise<SettingsMap> {
   for (const k of SEGMENTED_MAP_KEYS) {
     (out as Record<string, SegmentedSlotMap>)[k] = safeCompletedSlots(canonical[k]);
   }
+  out.report_policy = safeReportPolicy(canonical.report_policy);
 
   return out;
 }
@@ -272,7 +335,10 @@ async function load(): Promise<SettingsMap> {
 async function update(
   patch: Partial<SettingsMap>,
 ): Promise<{ error: Error | PostgrestError | null }> {
-  const payload: Record<string, string | number | null | SegmentedSlotMap> = {};
+  const payload: Record<
+    string,
+    string | number | null | SegmentedSlotMap | ReportPolicy
+  > = {};
   for (const [key, value] of Object.entries(patch)) {
     if (!(KNOWN_KEYS as readonly string[]).includes(key)) continue;
     if ((SEGMENTED_MAP_KEYS as readonly string[]).includes(key)) {
@@ -289,6 +355,16 @@ async function update(
         women: Array.isArray(v.women) ? v.women.filter((x): x is string => typeof x === 'string') : [],
         children: Array.isArray(v.children) ? v.children.filter((x): x is string => typeof x === 'string') : [],
       };
+      continue;
+    }
+    if (key === 'report_policy') {
+      // Same "undefined = leave alone" contract as the segmented
+      // maps. Values are passed through `safeReportPolicy` at write
+      // time so a malformed patch (out-of-range grace period, bogus
+      // enabled) never reaches the DB and re-hydrates cleanly on the
+      // next load().
+      if (value === undefined) continue;
+      payload.report_policy = safeReportPolicy(value);
       continue;
     }
     const normalized =

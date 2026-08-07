@@ -85,7 +85,11 @@ export function HalaqahDetails() {
       student.status === 'active' ? 'suspended' : 'active';
     setActivationLoadingId(student.id);
     try {
-      const { error } = await api.profiles.setStudentStatus(student.id, next);
+      const { error } = await api.profiles.setStudentStatus(
+        student.id,
+        next,
+        'halaqah_details',
+      );
       if (error) {
         toast.error(error.message || t('errors.unauthorized'));
         return;

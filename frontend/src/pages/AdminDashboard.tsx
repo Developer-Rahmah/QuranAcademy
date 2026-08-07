@@ -26,6 +26,7 @@ import {
   PageSection,
 } from '../components/templates/DashboardLayout';
 import { StatCard, StatCardRow } from '../components/molecules/StatCard';
+import { SuspensionOverviewWidget } from '../components/molecules/SuspensionOverviewWidget';
 import { HalaqahTable } from '../components/organisms/HalaqahTable';
 import { HalaqahForm } from '../components/organisms/HalaqahForm';
 import { Pagination } from '../components/molecules/Pagination';
@@ -41,6 +42,7 @@ import {
 } from '../components/atoms/Icon';
 import { useTranslation } from '../locales/i18n';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { ROUTES } from '../lib/routes';
 import { canManageSettings } from '../lib/permissions';
@@ -54,6 +56,7 @@ export function AdminDashboard() {
   const { t } = useTranslation();
   const toast = useToast();
   const { profile } = useAuth();
+  const { reportPolicy } = useSettings();
   const { stats, loading: loadingStats, refetch: refetchStats } =
     useAcademyStats();
 
@@ -307,6 +310,21 @@ export function AdminDashboard() {
               progressLabel={`${overallMemo.memorized} ${t('academy.pagesOutOf')} ${TOTAL_QURAN_PAGES}`}
             />
           </StatCardRow>
+
+          {/* Suspension-policy overview. Visible to admin +
+              supervisor_manager (the only roles able to read the
+              audit table). "Approaching suspension" is derived
+              from the reportPolicy grace period; when the policy
+              is disabled we skip that query entirely. */}
+          <SuspensionOverviewWidget
+            auditHref={ROUTES.adminAudit}
+            policyEnabled={reportPolicy.enabled}
+            approachingWithinDays={
+              reportPolicy.enabled
+                ? Math.min(3, reportPolicy.grace_period_days)
+                : undefined
+            }
+          />
 
           {/* Unassigned students banner — surfaces the academy-wide
               gap so the admin always knows who's waiting for a slot.

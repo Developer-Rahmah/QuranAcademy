@@ -9,3 +9,4 @@ export { halaqahApi  as halaqah }  from './halaqah';
 export { reportsApi  as reports }  from './reports';
 export { settingsApi as settings } from './settings';
 export { supervisorsApi as supervisors } from './supervisors';
+export { auditApi as audit } from './audit';

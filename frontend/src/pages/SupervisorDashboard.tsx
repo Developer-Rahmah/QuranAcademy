@@ -299,7 +299,11 @@ export function SupervisorDashboard() {
       row.status === "active" ? "suspended" : "active";
     setActivationLoadingId(row.id);
     try {
-      const { error } = await api.profiles.setStudentStatus(row.id, next);
+      const { error } = await api.profiles.setStudentStatus(
+        row.id,
+        next,
+        'supervisor_dashboard',
+      );
       if (error) {
         toast.error(error.message || t("errors.unauthorized"));
         return;

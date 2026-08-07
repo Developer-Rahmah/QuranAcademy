@@ -529,7 +529,101 @@
     "unopenedEmptyClosed": "لا توجد أوقات محدّدة كغير متاحة في هذا القسم. اضغط على أي وقت متاح بالأسفل لإخفائه من صفحة تسجيل الطلاب.",
     "unopenedSegmentTabsLabel": "اختر القسم لإدارته",
     "unopenedOn": "غير متاحة",
-    "unopenedOff": "متاحة"
+    "unopenedOff": "متاحة",
+    "reportPolicy": {
+      "title": "سياسة تقارير الطلاب",
+      "enableLabel": "تعليق حسابات الطلاب تلقائياً عند انقطاع رفع التقارير",
+      "enableHint": "عند التفعيل، تعمل مهمة يومية للتحقق من كل طالب نشط وتُعلّق حساب من تجاوز فترة السماح المحددة أدناه بدون تسليم تقرير. عند الإيقاف تخرج المهمة دون إجراء أي تعديل.",
+      "gracePeriodLabel": "فترة السماح",
+      "gracePeriodHint": "عدد الأيام التي يُسمح فيها بعدم رفع تقارير قبل تعليق حساب الطالب تلقائياً.",
+      "dayPreset": "{{n}} يوم",
+      "custom": "مخصص",
+      "customPlaceholder": "عدد الأيام",
+      "errors": {
+        "required": "يرجى إدخال عدد الأيام.",
+        "integer": "يرجى إدخال عدد صحيح.",
+        "positive": "يجب أن تكون فترة السماح رقماً صحيحاً موجباً."
+      },
+      "previewCtaTitle": "معاينة الطلاب الذين سيُعلَّقون اليوم",
+      "previewCtaHint": "للقراءة فقط. يعرض الطلاب الذين سيُعلِّقهم المُجدوِل وفق فترة السماح الحالية. لن يتم تعديل أي بيانات.",
+      "previewCtaLink": "فتح المعاينة"
+    }
+  },
+
+  "reportPolicyPreview": {
+    "title": "معاينة التعليق التلقائي",
+    "subtitle": "عرض للقراءة فقط للطلاب الذين سيُعلَّقون تلقائياً اليوم وفق سياسة التقارير الحالية.",
+    "readOnlyBadge": "للقراءة فقط — لا يتم تعديل أي بيانات",
+    "mode": "عرض",
+    "modeOnlySuspend": "الطلاب الذين سيُعلَّقون اليوم فقط",
+    "modeAll": "جميع الطلاب (مع التصنيف)",
+    "reasonFilter": "السبب",
+    "wouldSuspendCount": "سيُعلَّق اليوم ({{n}})",
+    "allCount": "جميع الطلاب ({{n}})",
+    "emptyWouldSuspend": "لا يوجد طلاب مؤهلون للتعليق وفق السياسة الحالية.",
+    "columns": {
+      "student": "الطالب/ة",
+      "halaqah": "الحلقة",
+      "teacher": "المعلم/ة",
+      "lastReport": "آخر تقرير",
+      "referenceDate": "التاريخ المرجعي",
+      "daysSince": "الأيام منذ",
+      "reason": "السبب"
+    },
+    "reason": {
+      "ALREADY_SUSPENDED": "معلَّق مسبقاً",
+      "PENDING": "بانتظار التفعيل",
+      "NO_HALAQAH": "لا توجد حلقة",
+      "INACTIVE_HALAQAH": "الحلقة غير نشطة",
+      "NO_REPORTS_YET": "لم يُرفع تقرير بعد",
+      "HAS_REPORTS": "لديه تقارير"
+    }
+  },
+
+  "adminAudit": {
+    "title": "سجل تغيّرات حالة الحسابات",
+    "subtitle": "كل عملية تفعيل أو تعليق داخل الأكاديمية — يدوية أو تلقائية.",
+    "entries": "السجلات",
+    "actorScheduler": "المُجدوِل التلقائي",
+    "actorUnknown": "غير معروف",
+    "filters": {
+      "from": "من تاريخ",
+      "to": "إلى تاريخ",
+      "student": "الطالب/ة",
+      "source": "المصدر",
+      "reason": "السبب",
+      "newStatus": "الحالة الجديدة"
+    },
+    "columns": {
+      "at": "التوقيت",
+      "student": "الطالب/ة",
+      "transition": "التحوّل",
+      "source": "المصدر",
+      "reason": "السبب",
+      "changedBy": "بواسطة"
+    },
+    "source": {
+      "admin_users": "إدارة المستخدمين",
+      "halaqah_details": "تفاصيل الحلقة",
+      "supervisor_dashboard": "لوحة المشرفين",
+      "automatic_scheduler": "المُجدوِل التلقائي",
+      "system": "النظام"
+    },
+    "reason": {
+      "manual_suspension": "تعليق يدوي",
+      "manual_activation": "تفعيل يدوي",
+      "automatic_suspension": "تعليق تلقائي",
+      "automatic_reactivation": "إعادة تفعيل تلقائي"
+    }
+  },
+
+  "suspensionWidget": {
+    "title": "التعليق والتفعيل",
+    "viewAudit": "عرض السجل الكامل",
+    "suspendedToday": "المُعلَّقة اليوم",
+    "automaticLast7": "تعليق تلقائي (آخر ٧ أيام)",
+    "manualLast7": "تعليق يدوي (آخر ٧ أيام)",
+    "approaching": "قاربت التعليق (≤ {{n}} أيام)"
   },
 
   "segment": {

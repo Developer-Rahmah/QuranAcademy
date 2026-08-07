@@ -79,6 +79,14 @@ const AdminSettings = lazy(() =>
 const MatchingCenter = lazy(() =>
   import("./pages/MatchingCenter").then((m) => ({ default: m.MatchingCenter })),
 );
+const AdminAudit = lazy(() =>
+  import("./pages/AdminAudit").then((m) => ({ default: m.AdminAudit })),
+);
+const ReportPolicyPreview = lazy(() =>
+  import("./pages/ReportPolicyPreview").then((m) => ({
+    default: m.ReportPolicyPreview,
+  })),
+);
 const HalaqahDetails = lazy(() =>
   import("./pages/HalaqahDetails").then((m) => ({ default: m.HalaqahDetails })),
 );
@@ -575,6 +583,37 @@ function AppRoutes() {
                 and run sweeps. */}
             <RoleGuard allow={["admin", "supervisor_manager"]}>
               <MatchingCenter />
+            </RoleGuard>
+          </AuthGuard>
+        }
+      />
+      <Route
+        path={ROUTES.adminAudit}
+        element={
+          <AuthGuard>
+            {/* Audit log surface. RLS on `status_change_audit`
+                already enforces admin + supervisor_manager as the
+                only readers; this guard keeps the URL from even
+                rendering for other roles. Teachers and halaqah
+                supervisors are explicitly excluded per spec. */}
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
+              <AdminAudit />
+            </RoleGuard>
+          </AuthGuard>
+        }
+      />
+      <Route
+        path={ROUTES.adminReportPolicyPreview}
+        element={
+          <AuthGuard>
+            {/* Read-only preview of the automatic suspension
+                policy. Nothing on this page mutates data — the
+                only DB touch is a SELECT on the
+                report_policy_evaluation view. Guard mirrors the
+                audit page so teachers / halaqah supervisors never
+                see it. */}
+            <RoleGuard allow={["admin", "supervisor_manager"]}>
+              <ReportPolicyPreview />
             </RoleGuard>
           </AuthGuard>
         }

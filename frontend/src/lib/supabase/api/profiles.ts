@@ -147,22 +147,39 @@ async function update(userId: string, updates: Partial<Profile>): Promise<Result
 
 /**
  * Set a STUDENT's account status (active / pending / suspended) via the
- * `set_student_status` RPC. The RPC (migration 0012) enforces scope:
- * teachers/halaqah_supervisors may only flip students within halaqahs
- * they manage. Admins/supervisor_managers can flip any non-org account.
+ * `set_student_status` RPC. The RPC (migrations 0012 / 0015 / 0020)
+ * enforces scope: teachers / halaqah_supervisors may only flip students
+ * within halaqahs they manage; admins / supervisor_managers can flip any
+ * non-org account. Since migration 0020, the RPC also writes a row into
+ * `status_change_audit` in the same transaction — no separate call site.
  *
- * Use this for any teacher / supervisor activation surface. Admin user
- * management still goes through `update()` directly (admin RLS).
+ * `source` identifies the UI surface the mutation originated from and is
+ * required for a truthful audit trail (avoid the DB default fallback
+ * 'system' unless there's literally no better label). `reason` is
+ * optional: when omitted, the DB derives it from (source, newStatus)
+ * via `default_status_change_reason`.
+ *
+ * Use this for EVERY activation surface — admin, supervisor manager,
+ * teacher, halaqah supervisor. The old direct `update({status})` path
+ * bypasses the audit and MUST NOT be used for status flips.
  */
+import type { AuditSource, AuditReason } from '../../audit/constants';
+
 async function setStudentStatus(
   studentId: string,
   newStatus: AccountStatus,
+  source: AuditSource,
+  reason?: AuditReason,
+  details?: Record<string, unknown>,
 ): Promise<{ error: Error | PostgrestError | null }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error } = await client.rpc('set_student_status', {
     target: studentId,
     new_status: newStatus,
+    p_source: source,
+    p_reason: reason ?? null,
+    p_details: details ?? {},
   });
   return { error };
 }
