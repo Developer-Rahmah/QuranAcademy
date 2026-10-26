@@ -118,7 +118,12 @@ export default async function handler(
  * Serverless function config — pin to the Node.js runtime so
  * `@vercel/node` types resolve correctly and `@supabase/supabase-js`
  * runs against the standard fetch runtime.
+ *
+ * NOTE: Vercel only accepts the generic runtime values 'edge',
+ * 'experimental-edge', or 'nodejs' here — a version-pinned value like
+ * 'nodejs20.x' fails the build. The Node major version is selected via
+ * the project's settings / vercel.json, not this field.
  */
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
 } as const;
