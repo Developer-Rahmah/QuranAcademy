@@ -48,6 +48,11 @@ const StudentRegistration = lazy(() =>
     default: m.StudentRegistration,
   })),
 );
+const SupervisorRegistration = lazy(() =>
+  import("./pages/SupervisorRegistration").then((m) => ({
+    default: m.SupervisorRegistration,
+  })),
+);
 const TeacherRegistration = lazy(() =>
   import("./pages/TeacherRegistration").then((m) => ({
     default: m.TeacherRegistration,
@@ -314,6 +319,26 @@ function DashboardDispatcher() {
     return <Navigate to={ROUTES.admin} replace />;
   }
 
+  // A pure volunteer supervisor (profile.role === 'halaqah_supervisor')
+  // always gets the supervisor portal — never the student portal, and
+  // never the dual-role picker (they are not also a student). This is the
+  // single-capability counterpart to the relational supervisor below
+  // (role='student' + assignment rows), which keeps its picker/switcher.
+  // Halaqah / student / report access stays gated by `halaqah_supervisors`
+  // rows + RLS: with no assignment the SupervisorDashboard renders its own
+  // empty state, so this grants a portal, not data.
+  if (profile.role === "halaqah_supervisor") {
+    return (
+      <RoleGuard allow="halaqah_supervisor">
+        <DashboardViewProvider
+          value={{ view: "supervisor", switchTo: () => {}, canSwitch: false }}
+        >
+          <SupervisorDashboard />
+        </DashboardViewProvider>
+      </RoleGuard>
+    );
+  }
+
   // Only block the dashboard render on the supervisor fetch when the
   // user has explicitly chosen the supervisor view this session. Pure
   // students and teachers see their dashboard immediately while the
@@ -414,9 +439,9 @@ function DashboardDispatcher() {
     );
   }
 
-  // Default rendering by primary role. profile.role === 'halaqah_supervisor'
-  // with no assignments is treated as a regular student per the spec
-  // (data drift / cleanup case). Teacher and student fall through here.
+  // Default rendering by primary role. `halaqah_supervisor` is handled by
+  // the dedicated branch above, so only teacher and student (incl.
+  // relational supervisors in the student view) reach here.
   switch (profile.role) {
     case "teacher":
       return (
@@ -425,7 +450,6 @@ function DashboardDispatcher() {
         </RoleGuard>
       );
     case "student":
-    case "halaqah_supervisor":
     default:
       return (
         <RoleGuard allow={["student", "halaqah_supervisor"]}>
@@ -504,6 +528,14 @@ function AppRoutes() {
         element={
           <PublicRoute>
             <TeacherRegistration />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path={ROUTES.registerSupervisor}
+        element={
+          <PublicRoute>
+            <SupervisorRegistration />
           </PublicRoute>
         }
       />

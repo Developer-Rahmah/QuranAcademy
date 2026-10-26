@@ -66,6 +66,16 @@ export function getUserRoleLabel(subject: SegmentSubject): string {
     if (seg === UserSegment.WOMEN) return 'auth.teacherFemale';
     return 'auth.teacher';
   }
+  // Supervisor roles get their own labels so they are never mislabelled as
+  // students. `supervisor_manager` is an org-level manager; a pure
+  // `halaqah_supervisor` (the volunteer-supervisor registration) is
+  // gendered by segment.
+  if (subject.role === 'supervisor_manager') return 'auth.supervisorManager';
+  if (subject.role === 'halaqah_supervisor') {
+    if (seg === UserSegment.MEN) return 'auth.supervisorMale';
+    if (seg === UserSegment.WOMEN) return 'auth.supervisorFemale';
+    return 'auth.volunteerSupervisor';
+  }
   // default to student-side labels for non-teacher / non-admin
   if (seg === UserSegment.MEN) return 'auth.studentMale';
   if (seg === UserSegment.WOMEN) return 'auth.studentFemale';

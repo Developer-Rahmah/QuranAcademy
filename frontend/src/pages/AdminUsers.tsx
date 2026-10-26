@@ -36,7 +36,9 @@ import {
   canAssignRole as permsCanAssignRole,
   isAdminOrSupervisorManager,
   canManageUserStatus,
+  canManageSupervisors,
 } from '../lib/permissions';
+import { SupervisorAssignmentDialog } from '../components/molecules/SupervisorAssignmentDialog';
 import type { Profile, UserRole, AccountStatus, UserSegment } from '../types';
 
 // ============================================
@@ -642,6 +644,12 @@ export function AdminUsers() {
     return parts.join(' ') || user.email;
   };
 
+  // Volunteer-supervisor → halaqah assignment dialog. Holds the target
+  // supervisor while open; null when closed. Assignment writes rows in
+  // `halaqah_supervisors` (RLS: admin / supervisor_manager only) and never
+  // touches `profile.role`.
+  const [assignTarget, setAssignTarget] = useState<{ id: string; name: string } | null>(null);
+
   // ============================================
   // Calculate Stats
   // ============================================
@@ -692,6 +700,7 @@ export function AdminUsers() {
     { value: 'all', label: t('common.all') },
     { value: 'student', label: t(uiText.getStudentLabel('mixed', 'plural')) },
     { value: 'teacher', label: t(uiText.getTeacherLabel('mixed', 'plural')) },
+    { value: 'halaqah_supervisor', label: t('auth.volunteerSupervisor') },
   ];
 
   const statusOptions = [
@@ -1076,37 +1085,61 @@ export function AdminUsers() {
                           </Button>
                         )}
 
-                        {/* Role-change dropdown. Visible only to viewers
-                            who can assign at least one role. Options are
-                            filtered to roles the viewer is allowed to
-                            grant, so a supervisor_manager never sees
-                            'admin' / 'supervisor_manager' in the menu. */}
-                        {isAdminOrSupervisorManager(viewerRole) && (
-                          <Select
-                            aria-label={t('admin.changeRole')}
-                            value={user.role}
-                            onChange={(e) => {
-                              const next = e.target.value as UserRole;
-                              if (next !== user.role) {
-                                void updateUserRole(user.id, next);
+                        {/* Volunteer supervisors get an explicit halaqah-
+                            ASSIGNMENT action (rows in halaqah_supervisors),
+                            never the role-promotion dropdown. Assignment is
+                            not a role change, and we deliberately don't
+                            expose admin / supervisor_manager promotion for
+                            these accounts through this ordinary workflow. */}
+                        {user.role === 'halaqah_supervisor' ? (
+                          canManageSupervisors(viewerRole) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setAssignTarget({
+                                  id: user.id,
+                                  name: getDisplayName(user),
+                                })
                               }
-                            }}
-                            options={[
-                              { value: 'student', label: t('auth.student') },
-                              { value: 'teacher', label: t('auth.teacher') },
-                              ...(canAssignRole('admin')
-                                ? [{ value: 'admin', label: t('auth.admin') }]
-                                : []),
-                              ...(canAssignRole('supervisor_manager')
-                                ? [
-                                    {
-                                      value: 'supervisor_manager',
-                                      label: t('auth.supervisorManager'),
-                                    },
-                                  ]
-                                : []),
-                            ]}
-                          />
+                              className="min-w-[7rem] justify-center"
+                            >
+                              {t('admin.assignHalaqahs')}
+                            </Button>
+                          )
+                        ) : (
+                          /* Role-change dropdown for student / teacher rows.
+                             Visible only to viewers who can assign at least
+                             one role; options are filtered to the roles the
+                             viewer may grant, so a supervisor_manager never
+                             sees 'admin' / 'supervisor_manager'. */
+                          isAdminOrSupervisorManager(viewerRole) && (
+                            <Select
+                              aria-label={t('admin.changeRole')}
+                              value={user.role}
+                              onChange={(e) => {
+                                const next = e.target.value as UserRole;
+                                if (next !== user.role) {
+                                  void updateUserRole(user.id, next);
+                                }
+                              }}
+                              options={[
+                                { value: 'student', label: t('auth.student') },
+                                { value: 'teacher', label: t('auth.teacher') },
+                                ...(canAssignRole('admin')
+                                  ? [{ value: 'admin', label: t('auth.admin') }]
+                                  : []),
+                                ...(canAssignRole('supervisor_manager')
+                                  ? [
+                                      {
+                                        value: 'supervisor_manager',
+                                        label: t('auth.supervisorManager'),
+                                      },
+                                    ]
+                                  : []),
+                              ]}
+                            />
+                          )
                         )}
                       </div>
                     </td>
@@ -1122,6 +1155,18 @@ export function AdminUsers() {
           </div>
         )}
       </PageSection>
+
+      {/* Volunteer-supervisor → halaqah assignment. Rendered once at the
+          page level; opened per-row from the Actions column. Backend RLS
+          restricts the writes to admin / supervisor_manager. */}
+      {assignTarget && (
+        <SupervisorAssignmentDialog
+          isOpen={assignTarget !== null}
+          onClose={() => setAssignTarget(null)}
+          userId={assignTarget.id}
+          userName={assignTarget.name}
+        />
+      )}
     </DashboardLayout>
   );
 }

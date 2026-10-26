@@ -19,6 +19,9 @@ export const registrationFormStyles = {
 
   timeSlotInfo: 'text-sm text-muted mb-4',
 
+  // Volunteer (unpaid) notice shown on the supervisor registration form.
+  notice: 'p-4 bg-primary/10 border border-primary/20 rounded-lg text-sm text-foreground leading-relaxed',
+
   agreement: {
     wrapper: 'space-y-4',
     error: 'text-sm text-destructive',

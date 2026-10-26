@@ -20,6 +20,7 @@ import {
   MEMORIZATION_LEVELS,
   LEVEL_LABELS,
   USER_SEGMENTS,
+  ROLES,
 } from '../../../lib/constants';
 import { DEFAULT_COUNTRY_ISO } from '../../../lib/countries';
 import { isValidEmail, validatePassword } from '../../../lib/utils';
@@ -42,7 +43,7 @@ import { segmentationRules } from '../../../lib/segmentationRules';
 // inline makes the submit payload's language value visible in the same
 // block as the signUp call, so nobody can drop or rename the key silently.
 import { registrationFormStyles } from './RegistrationForm.style';
-import type { StudentFormData, TeacherFormData, FormErrors } from './RegistrationForm.types';
+import type { StudentFormData, TeacherFormData, SupervisorFormData, FormErrors } from './RegistrationForm.types';
 import type { MemorizationLevel, UserSegment } from '../../../types';
 
 // ============================================
@@ -845,6 +846,259 @@ export function TeacherRegistrationForm() {
       <div className={registrationFormStyles.agreement.wrapper}>
         <Checkbox
           label={t('registration.agreementTeacher')}
+          checked={formData.agreed}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('agreed', e.target.checked)}
+          error={!!errors.agreed}
+        />
+        {errors.agreed && (
+          <p className={registrationFormStyles.agreement.error}>{errors.agreed}</p>
+        )}
+      </div>
+
+      <Button type="submit" size="full" loading={loading}>
+        {t('registration.submitRegistration')}
+      </Button>
+
+      <p className={registrationFormStyles.backLink.wrapper}>
+        <button
+          type="button"
+          onClick={() => navigate('/signup')}
+          className={registrationFormStyles.backLink.link}
+        >
+          {t('registration.backToSignup')}
+        </button>
+      </p>
+    </form>
+  );
+}
+
+// ============================================
+// Volunteer Supervisor Registration Form
+// ============================================
+export function SupervisorRegistrationForm() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { signUp, loading } = useAuth();
+  const toast = useToast();
+
+  const [formData, setFormData] = useState<SupervisorFormData>({
+    first_name: '',
+    second_name: '',
+    third_name: '',
+    age: '',
+    phoneField: { country: DEFAULT_COUNTRY_ISO, local: '' },
+    email: '',
+    password: '',
+    segment: USER_SEGMENTS.MEN as Extract<UserSegment, 'men' | 'women'>,
+    agreed: false,
+  });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const handleChange = <K extends keyof SupervisorFormData>(
+    field: K,
+    value: SupervisorFormData[K],
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field as string]) {
+      setErrors((prev) => ({ ...prev, [field as string]: '' }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.first_name.trim()) newErrors.first_name = t('validation.nameRequired');
+    if (!formData.second_name.trim()) newErrors.second_name = t('validation.nameRequired');
+    if (!formData.third_name.trim()) newErrors.third_name = t('validation.nameRequired');
+
+    // Supervisors are adults — mirror the teacher form's 18+ floor.
+    const age = parseInt(formData.age);
+    if (!formData.age || age < 18 || age > 100) {
+      newErrors.age = t('validation.ageRequired');
+    }
+    if (!formData.phoneField.country) {
+      newErrors.phoneField = t('validation.countryRequired');
+    } else {
+      const phoneCheck = validateLocalPhone(
+        formData.phoneField.country,
+        formData.phoneField.local,
+      );
+      if (!phoneCheck.isValid) {
+        newErrors.phoneField = t(phoneCheck.messageKey);
+      }
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = t('validation.emailRequired');
+    } else if (!isValidEmail(formData.email)) {
+      newErrors.email = t('validation.emailInvalid');
+    }
+
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      newErrors.password = t(passwordValidation.messageKey);
+    }
+
+    if (!formData.agreed) {
+      newErrors.agreed = t('validation.agreementRequired');
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (!validate()) {
+      toast.warning(t('validation.fixErrors'));
+      return;
+    }
+
+    // Reuses the exact same signUp pipeline as student/teacher. The role
+    // is the canonical, relational `halaqah_supervisor` — it grants no
+    // access until an admin assigns the account to a halaqah. No time
+    // slots / student_type / teacher fields are sent. Gender is carried by
+    // `segment`. The account lands as `pending`, awaiting admin approval.
+    const { error } = await signUp(formData.email, formData.password, {
+      first_name: formData.first_name,
+      second_name: formData.second_name,
+      third_name: formData.third_name,
+      phone: toE164({
+        country: formData.phoneField.country,
+        local: normalizeLocalForCountry(
+          formData.phoneField.country,
+          formData.phoneField.local,
+        ),
+      }),
+      country: formData.phoneField.country,
+      age: parseInt(formData.age),
+      role: ROLES.HALAQAH_SUPERVISOR,
+      segment: formData.segment,
+    });
+
+    if (error) {
+      const errorMessage = getErrorMessage(error);
+      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
+      return;
+    }
+
+    toast.success(t('registration.successMessage'));
+    navigate('/success');
+  };
+
+  // Two options, gendered by segment — using the existing ToggleGroup
+  // gender-selection convention. The option labels ARE the two requested
+  // registration choices (male / female volunteer supervisor).
+  const supervisorTypeOptions = [
+    { value: USER_SEGMENTS.MEN,   label: t('registration.supervisorMaleOption') },
+    { value: USER_SEGMENTS.WOMEN, label: t('registration.supervisorFemaleOption') },
+  ];
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className={registrationFormStyles.form}>
+      {errors.submit && (
+        <div className={registrationFormStyles.error.wrapper}>{errors.submit}</div>
+      )}
+
+      {/* Unpaid-volunteer notice — shown before the applicant submits. */}
+      <div className={registrationFormStyles.notice}>
+        {t('registration.volunteerNotice')}
+      </div>
+
+      <h2 className="text-xl font-medium text-foreground text-center">
+        {t(
+          formData.segment === USER_SEGMENTS.MEN
+            ? 'registration.supervisorMaleTitle'
+            : 'registration.supervisorFemaleTitle',
+        )}
+      </h2>
+
+      <FormSection title={t('registration.supervisorType')}>
+        <div>
+          <label className={registrationFormStyles.toggleField.label}>
+            {t('registration.supervisorType')} <span className={registrationFormStyles.toggleField.required}>*</span>
+          </label>
+          <ToggleGroup
+            options={supervisorTypeOptions}
+            value={formData.segment}
+            onChange={(value) =>
+              handleChange('segment', value as Extract<UserSegment, 'men' | 'women'>)
+            }
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title={t('registration.firstName')}>
+        <FormField
+          label={t('registration.firstName')}
+          name="first_name"
+          required
+          value={formData.first_name}
+          onChange={(e) => handleChange('first_name', e.target.value)}
+          error={errors.first_name}
+        />
+        <FormField
+          label={t('registration.secondName')}
+          name="second_name"
+          required
+          value={formData.second_name}
+          onChange={(e) => handleChange('second_name', e.target.value)}
+          error={errors.second_name}
+        />
+        <FormField
+          label={t('registration.thirdName')}
+          name="third_name"
+          required
+          value={formData.third_name}
+          onChange={(e) => handleChange('third_name', e.target.value)}
+          error={errors.third_name}
+        />
+        <FormField
+          label={t('registration.age')}
+          name="age"
+          type="number"
+          required
+          value={formData.age}
+          onChange={(e) => handleChange('age', e.target.value)}
+          error={errors.age}
+        />
+      </FormSection>
+
+      <FormSection title={t('auth.email')}>
+        <PhoneField
+          label={t('registration.phone')}
+          name="phone"
+          required
+          value={formData.phoneField}
+          onChange={(v) => handleChange('phoneField', v)}
+          error={errors.phoneField}
+          hint={t('registration.phoneWhatsappHint')}
+        />
+        <FormField
+          label={t('auth.email')}
+          name="email"
+          type="email"
+          required
+          value={formData.email}
+          onChange={(e) => handleChange('email', e.target.value)}
+          error={errors.email}
+        />
+        <PasswordField
+          label={t('auth.password')}
+          name="password"
+          required
+          value={formData.password}
+          onChange={(e) => handleChange('password', e.target.value)}
+          error={errors.password}
+          autoComplete="new-password"
+        />
+      </FormSection>
+
+      <div className={registrationFormStyles.agreement.wrapper}>
+        <Checkbox
+          label={t('registration.agreementSupervisor')}
           checked={formData.agreed}
           onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('agreed', e.target.checked)}
           error={!!errors.agreed}

@@ -60,6 +60,26 @@ export interface TeacherFormData {
   agreed: boolean;
 }
 
+/**
+ * Volunteer supervisor registration. A deliberately minimal subset of the
+ * student/teacher shapes: supervisors are not matched into halaqahs at
+ * signup, so there are no time slots, student_type, recitation, or
+ * teaching fields. Gender is carried by `segment` (men | women), exactly
+ * like the other forms.
+ */
+export interface SupervisorFormData {
+  first_name: string;
+  second_name: string;
+  third_name: string;
+  age: string;
+  phoneField: PhoneFieldValue;
+  email: string;
+  password: string;
+  /** Gender segment — only men | women for an adult volunteer supervisor. */
+  segment: Extract<UserSegment, 'men' | 'women'>;
+  agreed: boolean;
+}
+
 export interface FormErrors {
   [key: string]: string;
 }
@@ -69,5 +89,9 @@ export interface StudentRegistrationFormProps {
 }
 
 export interface TeacherRegistrationFormProps {
+  className?: string;
+}
+
+export interface SupervisorRegistrationFormProps {
   className?: string;
 }

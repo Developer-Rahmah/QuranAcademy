@@ -40,6 +40,11 @@ export const ROLES: Record<string, UserRole> = {
   STUDENT: 'student',
   TEACHER: 'teacher',
   ADMIN: 'admin',
+  // Canonical value for a volunteer halaqah supervisor. Reuses the
+  // relational `halaqah_supervisor` role (migration 0009) — it grants NO
+  // data access on its own; access requires a row in `halaqah_supervisors`,
+  // which only an admin can create. See lib/permissions.ts.
+  HALAQAH_SUPERVISOR: 'halaqah_supervisor',
 };
 
 // Account statuses

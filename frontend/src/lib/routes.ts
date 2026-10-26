@@ -16,6 +16,7 @@ export const ROUTES = {
   success: '/success',
   registerStudent: '/register/student',
   registerTeacher: '/register/teacher',
+  registerSupervisor: '/register/supervisor',
   /** Blog index (SEO content surface). */
   blog: '/blog',
   /** Single blog article — pattern with :slug param. */

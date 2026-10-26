@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout, AuthCard } from '../components/templates/AuthLayout';
 import { Button } from '../components/atoms/Button';
-import { UsersIcon, TeacherIcon } from '../components/atoms/Icon';
+import { UsersIcon, TeacherIcon, UserIcon } from '../components/atoms/Icon';
 import { cn } from '../lib/utils';
 import { useTranslation } from '../locales/i18n';
 import type { IconProps } from '../types';
@@ -37,6 +37,13 @@ export function Signup() {
       icon: UsersIcon,
       description: t('auth.teacherDesc'),
       path: '/register/teacher',
+    },
+    {
+      id: 'supervisor',
+      label: t('auth.volunteerSupervisor'),
+      icon: UserIcon,
+      description: t('auth.supervisorDesc'),
+      path: '/register/supervisor',
     },
   ];
 
